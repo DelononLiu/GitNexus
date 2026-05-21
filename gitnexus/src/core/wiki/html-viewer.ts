@@ -116,13 +116,16 @@ function buildHTML(
   // Content
   parts.push('<main class="content" id="content">');
   parts.push('<div class="empty-state"><h2>Loading…</h2></div>');
-  parts.push('  <div class="qa-entry">');
-  parts.push('    <form action="/qa/" method="GET" target="_blank">');
-  parts.push('      <input type="text" name="q" placeholder="Ask anything about this codebase..." autocomplete="off">');
-  parts.push('      <button type="submit">Ask</button>');
-  parts.push('    </form>');
-  parts.push('  </div>');
   parts.push('</main>');
+  parts.push('</div>');
+
+  // Q&A input bar (fixed bottom)
+  var qaPath = '/codewiki/' + encodeURIComponent(projectName) + '/qa';
+  parts.push('<div class="qa-entry">');
+  parts.push('  <form action="' + qaPath + '" method="GET" class="qa-form">');
+  parts.push('    <input type="text" name="q" placeholder="Ask anything about this codebase..." autocomplete="off">');
+  parts.push('    <button type="submit">Ask</button>');
+  parts.push('  </form>');
   parts.push('</div>');
 
   // ── Script ──
@@ -162,7 +165,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 .sidebar{width:280px;background:var(--sidebar-bg);border-right:1px solid var(--border);
   position:fixed;top:0;left:0;bottom:0;overflow-y:auto;padding:24px 16px;
   display:flex;flex-direction:column;z-index:10}
-.content{margin-left:280px;flex:1;padding:48px 64px;max-width:960px}
+.content{margin-left:280px;flex:1;padding:48px 64px 100px;max-width:960px}
 
 .sidebar-header{margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border)}
 .sidebar-title{font-size:16px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px}
@@ -211,18 +214,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 @media(max-width:768px){
   .sidebar{transform:translateX(-100%);transition:transform .2s}
   .sidebar.open{transform:translateX(0);box-shadow:2px 0 12px rgba(0,0,0,.1)}
-  .content{margin-left:0;padding:24px 20px;padding-top:56px}
+  .content{margin-left:0;padding:24px 20px 100px;padding-top:56px}
   .menu-toggle{display:block}
 }
 .empty-state{text-align:center;padding:80px 20px;color:var(--text-muted)}
 .empty-state h2{font-size:20px;margin-bottom:8px;border:none}
 
-.qa-entry{margin-top:40px;padding-top:24px;border-top:1px solid var(--border)}
-.qa-entry form{display:flex;gap:8px}
-.qa-entry input{flex:1;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:14px;outline:none;transition:border-color .15s}
-.qa-entry input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
-.qa-entry button{padding:10px 20px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;transition:opacity .15s}
-.qa-entry button:hover{opacity:.9}
+.qa-entry{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:100%;max-width:740px;z-index:20;padding:0 16px}
+.qa-form{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:8px 12px;box-shadow:0 4px 24px rgba(0,0,0,.06)}
+.qa-form input[type="text"]{flex:1;border:none;background:transparent;outline:none;font-size:14px;font-family:inherit;color:var(--text);padding:4px 0;line-height:1.5}
+.qa-form input[type="text"]::placeholder{color:var(--text-muted)}
+.qa-form button{padding:8px 20px;background:var(--primary);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;transition:opacity .15s;white-space:nowrap;flex-shrink:0}
+.qa-form button:hover{opacity:.88}
 `;
 
 // The client-side JS is kept as a plain string to avoid template literal conflicts

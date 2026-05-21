@@ -1918,8 +1918,8 @@ export const createServer = async (port: number, host: string = '127.0.0.1') => 
 
   // ── DeepWiki-style URL routes ────────────────────────────────────
 
-  // /codewiki/qa → Q&A page (global, repo via ?repo=)
-  app.get('/codewiki/qa', (req, res) => {
+  // /codewiki/:repo/qa → Q&A page scoped to a repo
+  app.get('/codewiki/:repo/qa', (req, res) => {
     res.sendFile(qaIndexFile);
   });
 

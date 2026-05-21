@@ -615,8 +615,9 @@ if (savedTheme === 'dark') {
   document.getElementById('themeToggle').textContent = '☀️';
 }
 
-// Extract repo from query param (?repo=)
-let currentRepo = new URLSearchParams(location.search).get('repo') || undefined;
+// Extract repo from path (/codewiki/<repo>/qa) or query param (?repo=)
+const pathRepoMatch = location.pathname.match(/^\/codewiki\/(?!qa\b)([^/]+)\/qa/);
+let currentRepo = pathRepoMatch?.[1] || new URLSearchParams(location.search).get('repo') || undefined;
 
 // Extract session ID from path (/codewiki/qa/123)
 const sessionMatch = location.pathname.match(/^\/codewiki\/qa\/(\d+)/);
