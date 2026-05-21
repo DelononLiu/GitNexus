@@ -1827,14 +1827,100 @@ export const createServer = async (port: number, host: string = '127.0.0.1') => 
     res.json({ id: job.id, status: 'failed', error: 'Cancelled by user' });
   });
 
+  // ── CodeWiki (Q&A + Wiki static pages) ──────────────────────────────
+
+  let createQaEndpointFn: ((...args: any[]) => any) | null = null;
+  let resolveLLMConfigFn: (() => any) | null = null;
+  try {
+    const qaMod = await import('../../../codewiki/server/qa-endpoint.js');
+    createQaEndpointFn = qaMod.createQaEndpoint;
+    const llmMod = await import('../core/wiki/llm-client.js');
+    resolveLLMConfigFn = llmMod.resolveLLMConfig;
+  } catch (e) {
+    console.warn('[codewiki] Q&A module not available:', (e as Error)?.message ?? e);
+  }
+
+  // Serve Q&A static page
+  const cwDirname = path.dirname(fileURLToPath(import.meta.url));
+  const qaIndexFile = path.resolve(cwDirname, '..', '..', '..', 'codewiki', 'qa', 'index.html');
+  const vendorDir = path.resolve(cwDirname, '..', '..', '..', 'codewiki', 'vendor');
+  app.use((req, res, next) => {
+    if (req.path === '/qa' || req.path === '/qa/') {
+      return res.sendFile(qaIndexFile);
+    }
+    next();
+  });
+  app.use('/vendor', async (req, res, next) => {
+    const filePath = path.join(vendorDir, req.path.replace(/^\//, ''));
+    if (!filePath.startsWith(vendorDir)) return res.status(403).end();
+    try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      const ext = path.extname(filePath);
+      const ct = ext === '.js' ? 'application/javascript' : ext === '.css' ? 'text/css' : 'application/octet-stream';
+      res.type(ct).send(content);
+    } catch { next(); }
+  });
+
+  // Serve Wiki static files (per-repo, from storagePath/wiki/)
+  // Serve Wiki files: handle /wiki/ and /wiki/some/path
+  app.use('/wiki', async (req, res, next) => {
+    const repoName = typeof req.query.repo === 'string' ? req.query.repo : undefined;
+    const entry = await resolveRepo(repoName).catch(() => null);
+    if (!entry) return next();
+    const wikiDir = path.join(entry.storagePath, 'wiki');
+    const relPath = req.path.replace(/^\//, '') || 'index.html';
+    const filePath = path.join(wikiDir, relPath);
+    if (!filePath.startsWith(wikiDir)) return res.status(403).end();
+    try {
+      let content = await fs.readFile(filePath, 'utf-8');
+      if (relPath === 'index.html' || relPath.endsWith('.html')) {
+        content = content
+          .replace(/https:\/\/cdn\.jsdelivr\.net\/npm\/marked@[^/]+\/marked\.min\.js/g, '/vendor/marked.min.js')
+          .replace(/https:\/\/cdn\.jsdelivr\.net\/npm\/mermaid@[^/]+\/dist\/mermaid\.min\.js/g, '/vendor/mermaid.min.js')
+          .replace(/https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/highlight\.js\/[^/]+\/highlight\.min\.css/g, '');
+      }
+      const ext = path.extname(filePath).toLowerCase();
+      const ct = ext === '.html' ? 'text/html' : ext === '.md' ? 'text/markdown' : ext === '.json' ? 'application/json' : 'application/octet-stream';
+      res.type(ct).send(content);
+    } catch {
+      if (relPath === 'index.html') {
+        res.status(404).type('text').send('Wiki not found. Run `gitnexus wiki` first.');
+      } else {
+        next();
+      }
+    }
+  });
+
+  // Q&A API: SSE streaming LLM endpoint (only if codewiki module loaded)
+  if (createQaEndpointFn && resolveLLMConfigFn) {
+    const searchCodebase = async (query: string, repoName?: string) => {
+      const entry = await resolveRepo(repoName);
+      if (!entry) return [];
+      const lbugPath = path.join(entry.storagePath, 'lbug');
+      return await withLbugDb(lbugPath, async () => {
+        const { hybridSearch: hs } = await import('../core/search/hybrid-search.js');
+        const { isEmbedderReady } = await import('../core/embeddings/embedder.js');
+        if (isEmbedderReady()) {
+          const { semanticSearch: semSearch } = await import(
+            '../core/embeddings/embedding-pipeline.js'
+          );
+          return await hs(query, 10, executeQuery, semSearch);
+        }
+        const { searchFTSFromLbug } = await import('../core/search/bm25-index.js');
+        const fts = await searchFTSFromLbug(query, 10);
+        return fts.results;
+      });
+    };
+    app.post('/api/qa', createQaEndpointFn(resolveRepo, resolveLLMConfigFn, searchCodebase));
+  }
+
   // ── Web UI (served at root) ───────────────────────────────────────
 
   // Resolve the gitnexus-web dist directory relative to this file's location.
   // In the published package: <pkg>/dist/server/api.js → <pkg>/web/
   // In dev (tsx):            gitnexus/src/server/api.ts → gitnexus-web/dist/
-  const __dirname = path.dirname(fileURLToPath(import.meta.url));
-  const webDistDir = path.resolve(__dirname, '..', '..', 'web');
-  const devWebDistDir = path.resolve(__dirname, '..', '..', '..', 'gitnexus-web', 'dist');
+  const webDistDir = path.resolve(cwDirname, '..', '..', 'web');
+  const devWebDistDir = path.resolve(cwDirname, '..', '..', '..', 'gitnexus-web', 'dist');
   const staticDir = await resolveWebDistDir(webDistDir, devWebDistDir);
   registerWebUI(app, staticDir);
 

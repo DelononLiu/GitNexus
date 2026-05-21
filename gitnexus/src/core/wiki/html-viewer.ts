@@ -116,6 +116,12 @@ function buildHTML(
   // Content
   parts.push('<main class="content" id="content">');
   parts.push('<div class="empty-state"><h2>Loading…</h2></div>');
+  parts.push('  <div class="qa-entry">');
+  parts.push('    <form action="/qa/" method="GET" target="_blank">');
+  parts.push('      <input type="text" name="q" placeholder="Ask anything about this codebase..." autocomplete="off">');
+  parts.push('      <button type="submit">Ask</button>');
+  parts.push('    </form>');
+  parts.push('  </div>');
   parts.push('</main>');
   parts.push('</div>');
 
@@ -210,6 +216,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 }
 .empty-state{text-align:center;padding:80px 20px;color:var(--text-muted)}
 .empty-state h2{font-size:20px;margin-bottom:8px;border:none}
+
+.qa-entry{margin-top:40px;padding-top:24px;border-top:1px solid var(--border)}
+.qa-entry form{display:flex;gap:8px}
+.qa-entry input{flex:1;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:14px;outline:none;transition:border-color .15s}
+.qa-entry input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+.qa-entry button{padding:10px 20px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;transition:opacity .15s}
+.qa-entry button:hover{opacity:.9}
 `;
 
 // The client-side JS is kept as a plain string to avoid template literal conflicts

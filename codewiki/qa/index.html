@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Code Q&A</title>
+<script src="/vendor/marked.min.js"></script>
+<script src="/vendor/highlight.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#ffffff;--surface:#f8f9fb;--border:#e5e7eb;--text:#1e293b;--text-muted:#64748b;--primary:#2563eb;--primary-soft:#eff6ff;--user-bubble:#2563eb;--code-bg:#f1f5f9;--radius:8px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.6;color:var(--text);background:var(--bg);height:100vh;overflow:hidden}
+
+.qa-container{display:flex;flex-direction:column;height:100vh;max-width:860px;margin:0 auto;padding:0 24px}
+.qa-header{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--border)}
+.qa-header h1{font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px}
+.qa-header-actions{display:flex;gap:8px}
+.qa-header button{background:none;border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;font-size:12px;cursor:pointer;color:var(--text-muted);transition:all .15s}
+.qa-header button:hover{background:var(--surface);color:var(--text)}
+
+.qa-messages{flex:1;overflow-y:auto;padding:24px 0}
+.qa-messages-inner{display:flex;flex-direction:column;gap:24px;min-height:100%}
+
+.empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--text-muted);padding:40px}
+.empty-state h2{font-size:18px;color:var(--text);margin-bottom:8px}
+.empty-state p{font-size:14px;margin-bottom:20px}
+.suggestions{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.suggestions button{padding:8px 16px;border:1px solid var(--border);border-radius:20px;background:var(--surface);font-size:13px;color:var(--text);cursor:pointer;transition:all .15s}
+.suggestions button:hover{border-color:var(--primary);color:var(--primary)}
+
+.message{display:flex;flex-direction:column;animation:fadeIn .2s ease-out}
+.message.user{align-items:flex-end}
+.message.assistant{align-items:flex-start}
+
+.bubble{max-width:85%;padding:12px 16px;border-radius:12px;font-size:14px;line-height:1.6;word-wrap:break-word}
+.message.user .bubble{background:var(--user-bubble);color:#fff;border-bottom-right-radius:4px}
+.message.assistant .bubble{background:var(--surface);border:1px solid var(--border);border-bottom-left-radius:4px}
+
+.bubble pre{background:#1e293b;color:#e2e8f0;border-radius:6px;padding:12px;overflow-x:auto;margin:8px 0;font-size:13px;line-height:1.5;position:relative}
+.bubble pre code{background:none;padding:0;font-size:13px;color:inherit}
+.bubble code{font-family:'SF Mono',Consolas,'Courier New',monospace;font-size:13px;background:var(--code-bg);padding:2px 6px;border-radius:4px}
+.message.user .bubble code{background:rgba(255,255,255,.15)}
+.bubble p{margin:6px 0}
+.bubble p:first-child{margin-top:0}
+.bubble p:last-child{margin-bottom:0}
+.bubble ul,.bubble ol{margin:6px 0 6px 20px}
+.bubble li{margin:3px 0}
+.bubble blockquote{border-left:3px solid var(--primary);padding:6px 12px;margin:8px 0;background:var(--primary-soft);border-radius:0 4px 4px 0;font-size:13px}
+.bubble h1,.bubble h2,.bubble h3,.bubble h4{margin:12px 0 6px}
+.bubble h1{font-size:18px}
+.bubble h2{font-size:16px}
+.bubble h3{font-size:15px}
+.bubble table{border-collapse:collapse;width:100%;margin:8px 0;font-size:13px}
+.bubble th,.bubble td{border:1px solid var(--border);padding:6px 10px;text-align:left}
+.bubble th{background:var(--surface);font-weight:600}
+.bubble a{color:var(--primary);text-decoration:none}
+.bubble a:hover{text-decoration:underline}
+.bubble hr{border:none;border-top:1px solid var(--border);margin:16px 0}
+
+.typing-indicator{display:inline-flex;gap:4px;padding:4px 0}
+.typing-indicator span{width:6px;height:6px;border-radius:50%;background:var(--text-muted);animation:bounce 1.4s infinite}
+.typing-indicator span:nth-child(2){animation-delay:.2s}
+.typing-indicator span:nth-child(3){animation-delay:.4s}
+@keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}
+
+.qa-input{border-top:1px solid var(--border);padding:16px 0 24px}
+.qa-input form{display:flex;gap:8px}
+.qa-input input{flex:1;padding:12px 16px;border:1px solid var(--border);border-radius:8px;font-size:14px;outline:none;transition:border-color .15s}
+.qa-input input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+.qa-input button{padding:12px 24px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;transition:opacity .15s}
+.qa-input button:hover{opacity:.9}
+.qa-input button:disabled{opacity:.4;cursor:not-allowed}
+.qa-error{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;margin:8px 0;font-size:13px;color:#991b1b}
+.qa-error button{background:none;border:none;color:var(--primary);cursor:pointer;font-size:13px;padding:0;margin-left:8px;text-decoration:underline}
+
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+
+<div class="qa-container">
+  <div class="qa-header">
+    <h1>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+      Code Q&amp;A
+    </h1>
+    <div class="qa-header-actions">
+      <button onclick="clearChat()">Clear</button>
+      <button onclick="location.href='/api/wiki/'">← Wiki</button>
+    </div>
+  </div>
+
+  <div class="qa-messages" id="messages">
+    <div class="qa-messages-inner" id="messagesInner">
+      <div class="empty-state" id="emptyState">
+        <h2>Ask about this codebase</h2>
+        <p>I can help you understand architecture, find code, or explain how things work.</p>
+        <div class="suggestions">
+          <button onclick="askSuggestion('Explain the project architecture')">Project architecture</button>
+          <button onclick="askSuggestion('What are the main modules?')">Main modules</button>
+          <button onclick="askSuggestion('How does the data flow work?')">Data flow</button>
+          <button onclick="askSuggestion('Show me key API endpoints')">Key APIs</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="qa-input">
+    <form id="qaForm" onsubmit="sendMessage(event)">
+      <input type="text" id="qaInput" placeholder="Ask anything about this codebase..." autocomplete="off" autofocus>
+      <button type="submit" id="sendBtn">Ask</button>
+    </form>
+  </div>
+</div>
+
+<script>
+const messages = [];
+let isLoading = false;
+let abortController = null;
+
+const messagesEl = document.getElementById('messages');
+const messagesInner = document.getElementById('messagesInner');
+const emptyState = document.getElementById('emptyState');
+const form = document.getElementById('qaForm');
+const input = document.getElementById('qaInput');
+const sendBtn = document.getElementById('sendBtn');
+
+function scrollToBottom() {
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function addMessage(role, content) {
+  emptyState.style.display = 'none';
+  const div = document.createElement('div');
+  div.className = 'message ' + role;
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  if (role === 'assistant') {
+    const rendered = marked.parse(content);
+    bubble.innerHTML = rendered;
+    bubble.querySelectorAll('pre code').forEach((block) => {
+      hljs.highlightElement(block);
+    });
+  } else {
+    bubble.textContent = content;
+  }
+  div.appendChild(bubble);
+  messagesInner.appendChild(div);
+  scrollToBottom();
+  return bubble;
+}
+
+function updateAssistantMessage(content) {
+  let lastMsg = messagesInner.querySelector('.message.assistant:last-child');
+  if (!lastMsg) {
+    lastMsg = document.createElement('div');
+    lastMsg.className = 'message assistant';
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    lastMsg.appendChild(bubble);
+    messagesInner.appendChild(lastMsg);
+  }
+  const bubble = lastMsg.querySelector('.bubble');
+  bubble.innerHTML = marked.parse(content);
+  bubble.querySelectorAll('pre code').forEach((block) => {
+    hljs.highlightElement(block);
+  });
+  scrollToBottom();
+}
+
+function showError(msg) {
+  emptyState.style.display = 'none';
+  const div = document.createElement('div');
+  div.className = 'qa-error';
+  div.innerHTML = msg + '<button onclick="this.parentElement.remove()">Dismiss</button>';
+  messagesInner.appendChild(div);
+  scrollToBottom();
+}
+
+function setLoading(loading) {
+  isLoading = loading;
+  sendBtn.disabled = loading || !input.value.trim();
+  input.disabled = loading;
+  if (loading) {
+    const indicator = document.createElement('div');
+    indicator.className = 'typing-indicator';
+    indicator.id = 'typingIndicator';
+    indicator.innerHTML = '<span></span><span></span><span></span>';
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'message assistant';
+    msgDiv.id = 'assistantTyping';
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.appendChild(indicator);
+    msgDiv.appendChild(bubble);
+    messagesInner.appendChild(msgDiv);
+    scrollToBottom();
+  } else {
+    const typing = document.getElementById('assistantTyping');
+    if (typing) typing.remove();
+  }
+}
+
+async function sendMessage(e) {
+  e.preventDefault();
+  const text = input.value.trim();
+  if (!text || isLoading) return;
+  input.value = '';
+
+  messages.push({ role: 'user', content: text });
+  addMessage('user', text);
+
+  setLoading(true);
+  abortController = new AbortController();
+
+  let assistantContent = '';
+
+  try {
+    const resp = await fetch('/api/qa', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: text, history: messages.slice(0, -1) }),
+      signal: abortController.signal,
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: 'Request failed' }));
+      showError(err.error || 'Request failed');
+      setLoading(false);
+      return;
+    }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data: ')) continue;
+        try {
+          const data = JSON.parse(trimmed.slice(6));
+          if (data.type === 'token') {
+            assistantContent += data.content;
+            updateAssistantMessage(assistantContent);
+          } else if (data.type === 'error') {
+            showError(data.message || 'An error occurred');
+          }
+        } catch {}
+      }
+    }
+
+    if (assistantContent) {
+      messages.push({ role: 'assistant', content: assistantContent });
+    }
+  } catch (err) {
+    if (err.name !== 'AbortError') {
+      showError(err.message || 'Network error');
+    }
+  } finally {
+    setLoading(false);
+    abortController = null;
+  }
+}
+
+function clearChat() {
+  messages.length = 0;
+  messagesInner.querySelectorAll('.message, .qa-error').forEach((el) => el.remove());
+  emptyState.style.display = '';
+  input.value = '';
+  input.focus();
+}
+
+function askSuggestion(text) {
+  input.value = text;
+  sendMessage(new Event('submit', { cancelable: true }));
+}
+
+const params = new URLSearchParams(location.search);
+const initialQ = params.get('q');
+if (initialQ) {
+  input.value = initialQ;
+  sendMessage(new Event('submit', { cancelable: true }));
+}
+</script>
+</body>
+</html>
