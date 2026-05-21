@@ -1,6 +1,15 @@
 import fs from 'fs/promises';
 import path from 'path';
 
+function log(level: 'info' | 'warn' | 'error' | 'debug', msg: string, data?: Record<string, unknown>) {
+  const ts = new Date().toISOString();
+  if (data && Object.keys(data).length > 0) {
+    console.error(`[${ts}] [qa] [${level}] ${msg} ${JSON.stringify(data)}`);
+  } else {
+    console.error(`[${ts}] [qa] [${level}] ${msg}`);
+  }
+}
+
 export function createQaEndpoint(
   resolveRepo: (repoName?: string) => Promise<{ storagePath: string; name: string } | undefined>,
   resolveLLMConfig: () => Promise<{
@@ -19,23 +28,34 @@ export function createQaEndpoint(
     const repoName = req.body?.repo ?? (req.query?.repo as string | undefined);
 
     if (!question) {
+      log('warn', 'missing question in request body');
       res.status(400).json({ error: 'Missing "question" in request body' });
       return;
     }
 
+    log('info', `Q&A request`, { repo: repoName ?? '(all)', question: question.slice(0, 80) });
+
     let wikiContext = '';
     const entry = await resolveRepo(repoName);
     if (entry) {
+      log('info', `resolved repo`, { name: entry.name, storagePath: entry.storagePath });
       const overviewPath = path.join(entry.storagePath, 'wiki', 'overview.md');
       try {
         wikiContext = await fs.readFile(overviewPath, 'utf-8');
-      } catch {}
+        log('info', `wiki context loaded`, { bytes: wikiContext.length });
+      } catch {
+        log('warn', 'failed to read wiki overview', { path: overviewPath });
+      }
+    } else {
+      log('warn', `repo not found`, { repoName });
     }
 
     let searchResults: any[] = [];
     let searchContent = '';
+    let sources: any[] = [];
     try {
       searchResults = await search(question, repoName);
+      log('info', `search completed`, { total: searchResults.length, top: Math.min(searchResults.length, 5) });
       if (searchResults.length > 0) {
         const repoBase = entry ? path.dirname(entry.storagePath) : null;
         const topResults = searchResults.slice(0, 5);
@@ -43,6 +63,14 @@ export function createQaEndpoint(
         for (const r of topResults) {
           lines.push(`${r.label ?? 'File'}: ${r.name ?? r.filePath?.split('/').pop() ?? '?'}` +
             ` — ${r.filePath}${r.startLine ? `:${r.startLine}` : ''}`);
+          const sourceEntry: any = {
+            filePath: r.filePath,
+            label: r.label ?? 'File',
+            startLine: r.startLine,
+            endLine: r.endLine,
+            fileName: r.filePath?.split('/').pop() ?? '?',
+            snippet: '',
+          };
           if (repoBase && r.filePath) {
             const srcPath = path.join(repoBase, r.filePath);
             try {
@@ -53,17 +81,27 @@ export function createQaEndpoint(
               const snippet = srcLines.slice(start, end).map((l: string, i: number) =>
                 `${start + i + 1}: ${l}`).join('\n');
               lines.push(`\`\`\`\n${snippet}\n\`\`\``);
-            } catch {}
+              sourceEntry.snippet = snippet;
+            } catch {
+              log('warn', 'failed to read source file for snippet', { filePath: r.filePath });
+            }
           }
+          sources.push(sourceEntry);
         }
         searchContent = lines.join('\n');
       }
-    } catch {}
+    } catch (e) {
+      log('error', 'search failed', { error: (e as Error)?.message });
+    }
+
+    log('info', `built sources for frontend`, { count: sources.length });
 
     let llmConfig: any;
     try {
       llmConfig = await resolveLLMConfig();
-    } catch {
+      log('info', `LLM config resolved`, { model: llmConfig?.model, provider: llmConfig?.provider ?? 'default' });
+    } catch (e) {
+      log('error', 'failed to resolve LLM config', { error: (e as Error)?.message });
       res.status(500).json({
         error:
           'Failed to resolve LLM configuration. Set GITNEXUS_API_KEY or configure ~/.gitnexus/config.json',
@@ -72,6 +110,7 @@ export function createQaEndpoint(
     }
 
     if (!llmConfig?.apiKey) {
+      log('error', 'LLM API key missing from resolved config');
       res.status(500).json({ error: 'LLM API key not configured.' });
       return;
     }
@@ -80,6 +119,9 @@ export function createQaEndpoint(
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
+
+    res.write(`data: ${JSON.stringify({ type: 'sources', sources })}\n\n`);
+    log('info', `sources event emitted`, { count: sources.length });
 
     const systemPrompt = `You are Nexus, a Code Analysis Agent with access to a Knowledge Graph. Your responses MUST be grounded.
 
@@ -145,6 +187,8 @@ ${wikiContext ? wikiContext.slice(0, 3000) : 'No wiki documentation available.'}
       aborted = true;
     });
 
+    log('info', `streaming LLM response`, { model: llmConfig.model });
+
     try {
       const response = await fetch(baseUrl, {
         method: 'POST',
@@ -154,12 +198,14 @@ ${wikiContext ? wikiContext.slice(0, 3000) : 'No wiki documentation available.'}
 
       if (!response.ok) {
         const errText = await response.text().catch(() => 'unknown error');
+        log('error', `LLM API returned error`, { status: response.status, body: errText.slice(0, 200) });
         res.write(`data: ${JSON.stringify({ type: 'error', message: `LLM API error: ${errText.slice(0, 500)}` })}\n\n`);
         res.end();
         return;
       }
 
       if (!response.body) {
+        log('error', 'LLM returned empty response body');
         res.write(`data: ${JSON.stringify({ type: 'error', message: 'LLM returned no response body' })}\n\n`);
         res.end();
         return;
@@ -168,9 +214,10 @@ ${wikiContext ? wikiContext.slice(0, 3000) : 'No wiki documentation available.'}
       const decoder = new TextDecoder();
       const reader = response.body.getReader();
       let buffer = '';
+      let tokenCount = 0;
 
       while (true) {
-        if (aborted) { reader.cancel(); break; }
+        if (aborted) { log('warn', 'client aborted stream'); reader.cancel(); break; }
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
@@ -185,16 +232,21 @@ ${wikiContext ? wikiContext.slice(0, 3000) : 'No wiki documentation available.'}
             const parsed = JSON.parse(data);
             const delta = parsed.choices?.[0]?.delta?.content;
             if (delta) {
+              tokenCount++;
               res.write(`data: ${JSON.stringify({ type: 'token', content: delta })}\n\n`);
             }
-          } catch {}
+          } catch {
+            log('debug', 'failed to parse SSE chunk', { chunk: data.slice(0, 100) });
+          }
         }
       }
 
+      log('info', `stream complete`, { tokens: tokenCount });
       res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
       res.end();
     } catch (err: any) {
       if (!aborted) {
+        log('error', 'LLM stream failed', { error: err.message });
         res.write(`data: ${JSON.stringify({ type: 'error', message: err.message ?? 'Unknown error' })}\n\n`);
         res.end();
       }
