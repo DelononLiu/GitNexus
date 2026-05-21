@@ -152,7 +152,7 @@ function addMessage(role, content) {
 }
 
 function updateAssistantMessage(content) {
-  let lastMsg = messagesInner.querySelector('.message.assistant:last-child');
+  let lastMsg = messagesInner.querySelector('.message.assistant:not(#assistantTyping):last-child');
   if (!lastMsg) {
     lastMsg = document.createElement('div');
     lastMsg.className = 'message assistant';
