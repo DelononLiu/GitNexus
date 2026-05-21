@@ -33,8 +33,31 @@ export function createQaEndpoint(
     }
 
     let searchResults: any[] = [];
+    let searchContent = '';
     try {
       searchResults = await search(question, repoName);
+      if (searchResults.length > 0) {
+        const repoBase = entry ? path.dirname(entry.storagePath) : null;
+        const topResults = searchResults.slice(0, 5);
+        const lines: string[] = [];
+        for (const r of topResults) {
+          lines.push(`${r.label ?? 'File'}: ${r.name ?? r.filePath?.split('/').pop() ?? '?'}` +
+            ` — ${r.filePath}${r.startLine ? `:${r.startLine}` : ''}`);
+          if (repoBase && r.filePath) {
+            const srcPath = path.join(repoBase, r.filePath);
+            try {
+              const srcContent = await fs.readFile(srcPath, 'utf-8');
+              const srcLines = srcContent.split('\n');
+              const start = r.startLine ? Math.max(0, r.startLine - 2) : 0;
+              const end = r.endLine ? Math.min(srcLines.length, r.endLine + 2) : Math.min(srcLines.length, start + 20);
+              const snippet = srcLines.slice(start, end).map((l: string, i: number) =>
+                `${start + i + 1}: ${l}`).join('\n');
+              lines.push(`\`\`\`\n${snippet}\n\`\`\``);
+            } catch {}
+          }
+        }
+        searchContent = lines.join('\n');
+      }
     } catch {}
 
     let llmConfig: any;
@@ -58,26 +81,42 @@ export function createQaEndpoint(
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
 
-    const searchContext =
-      searchResults.length > 0
-        ? `\n## Relevant Code\n\n${searchResults
-            .slice(0, 15)
-            .map(
-              (r: any, i: number) =>
-                `${i + 1}. ${r.label ?? 'File'}: ${r.name ?? r.filePath?.split('/').pop() ?? '?'}\n   File: ${r.filePath}${r.startLine ? `:${r.startLine}-${r.endLine ?? ''}` : ''}`,
-            )
-            .join('\n')}`
-        : '';
+    const systemPrompt = `You are Nexus, a Code Analysis Agent with access to a Knowledge Graph. Your responses MUST be grounded.
 
-    const systemPrompt = `You are a helpful code assistant analyzing a software project. Answer questions based on the codebase and your knowledge.
+## ⚠️ MANDATORY: GROUNDING
+Every factual claim MUST include a citation.
+- File refs: [[src/auth.ts:45-60]] (line range with hyphen)
+- NO citation = NO claim. Say "I didn't find evidence" instead of guessing.
 
-${wikiContext ? `## Wiki Overview\n\n${wikiContext.slice(0, 3000)}\n` : ''}${searchContext}
-When answering:
-- Use Markdown formatting
+## 🧠 CORE PROTOCOL
+You are an investigator. For each question:
+1. **Search** → Review the search results and wiki context below
+2. **Read** → Reference actual file content and line numbers
+3. **Cite** → Ground every finding with [[file:line]]
+4. **Validate** → Ensure each claim is supported by evidence
+
+## 📊 GRAPH SCHEMA
+Nodes: File, Folder, Function, Class, Interface, Method, Community, Process
+Relations: CodeRelation with type: CONTAINS, DEFINES, IMPORTS, CALLS, EXTENDS, IMPLEMENTS, MEMBER_OF, STEP_IN_PROCESS
+
+## 📐 GRAPH SEMANTICS
+- CALLS: Method invocation OR constructor injection
+- IMPORTS: File-level import/include statement
+- EXTENDS/IMPLEMENTS: Class inheritance
+
+## 🎯 OUTPUT STYLE
+Think like a senior architect. Be concise—no fluff.
+- Use tables for comparisons/rankings
+- Use mermaid diagrams for flows/dependencies
 - Use code blocks with language identifiers
-- Reference specific files and line numbers: [[file:line]]
-- Be concise and accurate
-- If you don't know something, say so`;
+- End with **TL;DR** (short summary of the response)
+- If you don't know something, say so
+
+## 📄 SEARCH RESULTS
+${searchContent.slice(0, 5000) || 'No specific search results found for this query.'}
+
+## 📚 WIKI CONTEXT
+${wikiContext ? wikiContext.slice(0, 3000) : 'No wiki documentation available.'}`;
 
     const messages = [
       { role: 'system', content: systemPrompt },
