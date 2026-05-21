@@ -1830,10 +1830,12 @@ export const createServer = async (port: number, host: string = '127.0.0.1') => 
   // ── CodeWiki (Q&A + Wiki static pages) ──────────────────────────────
 
   let createQaEndpointFn: ((...args: any[]) => any) | null = null;
+  let getSessionFn: ((id: string) => any) | null = null;
   let resolveLLMConfigFn: (() => any) | null = null;
   try {
     const qaMod = await import('../../../codewiki/server/qa-endpoint.js');
     createQaEndpointFn = qaMod.createQaEndpoint;
+    getSessionFn = qaMod.getSession;
     const llmMod = await import('../core/wiki/llm-client.js');
     resolveLLMConfigFn = llmMod.resolveLLMConfig;
   } catch (e) {
@@ -1913,6 +1915,49 @@ export const createServer = async (port: number, host: string = '127.0.0.1') => 
     };
     app.post('/api/qa', createQaEndpointFn(resolveRepo, resolveLLMConfigFn, searchCodebase));
   }
+
+  // ── DeepWiki-style URL routes ────────────────────────────────────
+
+  // /codewiki/qa → Q&A page (global, repo via ?repo=)
+  app.get('/codewiki/qa', (req, res) => {
+    res.sendFile(qaIndexFile);
+  });
+
+  // /codewiki/qa/:id → Q&A page with session ID (like GitHub issue /codewiki/qa/42)
+  app.get('/codewiki/qa/:id', (req, res) => {
+    res.sendFile(qaIndexFile);
+  });
+
+  // /api/qa/session/:id → restore session data
+  if (getSessionFn) {
+    app.get('/api/qa/session/:id', (req, res) => {
+      const session = getSessionFn!(req.params.id);
+      if (!session) { res.status(404).json({ error: 'Session not found' }); return; }
+      res.json({ id: session.id, messages: session.messages, repo: session.repo, createdAt: session.createdAt });
+    });
+  }
+
+  // /codewiki/:repo → Wiki overview
+  app.get('/codewiki/:repo', async (req, res) => {
+    const repoName = req.params.repo;
+    const entry = await resolveRepo(repoName).catch(() => null);
+    if (!entry) {
+      res.status(404).type('text').send(`Repo "${repoName}" not found. Run \`gitnexus analyze --path <path>\` first.`);
+      return;
+    }
+    const wikiDir = path.join(entry.storagePath, 'wiki');
+    const indexPath = path.join(wikiDir, 'index.html');
+    try {
+      let content = await fs.readFile(indexPath, 'utf-8');
+      content = content
+        .replace(/https:\/\/cdn\.jsdelivr\.net\/npm\/marked@[^/]+\/marked\.min\.js/g, '/vendor/marked.min.js')
+        .replace(/https:\/\/cdn\.jsdelivr\.net\/npm\/mermaid@[^/]+\/dist\/mermaid\.min\.js/g, '/vendor/mermaid.min.js')
+        .replace(/https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/highlight\.js\/[^/]+\/highlight\.min\.css/g, '');
+      res.type('html').send(content);
+    } catch {
+      res.status(404).type('text').send('Wiki not found. Run `gitnexus wiki` first.');
+    }
+  });
 
   // ── Web UI (served at root) ───────────────────────────────────────
 

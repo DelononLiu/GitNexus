@@ -1,6 +1,28 @@
 import fs from 'fs/promises';
 import path from 'path';
 
+// ── Session store ──────────────────────────────────────────────
+interface QaMessage { role: string; content: string }
+interface QaSession {
+  id: string;
+  messages: QaMessage[];
+  repo?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const sessions = new Map<string, QaSession>();
+let sessionSeq = 0;
+
+function generateSessionId(): string {
+  sessionSeq++;
+  return String(sessionSeq);
+}
+
+export function getSession(id: string): QaSession | undefined {
+  return sessions.get(id);
+}
+
 function log(level: 'info' | 'warn' | 'error' | 'debug', msg: string, data?: Record<string, unknown>) {
   const ts = new Date().toISOString();
   if (data && Object.keys(data).length > 0) {
@@ -26,6 +48,7 @@ export function createQaEndpoint(
     const question = req.body?.question?.trim();
     const history: { role: string; content: string }[] = req.body?.history ?? [];
     const repoName = req.body?.repo ?? (req.query?.repo as string | undefined);
+    let sessionId: string | undefined = req.body?.sessionId;
 
     if (!question) {
       log('warn', 'missing question in request body');
@@ -33,7 +56,16 @@ export function createQaEndpoint(
       return;
     }
 
-    log('info', `Q&A request`, { repo: repoName ?? '(all)', question: question.slice(0, 80) });
+    log('info', `Q&A request`, { repo: repoName ?? '(all)', sessionId: sessionId ?? '(new)', question: question.slice(0, 80) });
+
+    // Load or create session
+    let session = sessionId ? sessions.get(sessionId) : undefined;
+    if (!session) {
+      sessionId = generateSessionId();
+      session = { id: sessionId, messages: [], repo: repoName, createdAt: new Date(), updatedAt: new Date() };
+      sessions.set(sessionId, session);
+      log('info', `created new session`, { sessionId });
+    }
 
     let wikiContext = '';
     const entry = await resolveRepo(repoName);
@@ -120,8 +152,15 @@ export function createQaEndpoint(
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
 
+    // Emit session ID so frontend can update URL
+    res.write(`data: ${JSON.stringify({ type: 'session', id: sessionId })}\n\n`);
+
     res.write(`data: ${JSON.stringify({ type: 'sources', sources })}\n\n`);
     log('info', `sources event emitted`, { count: sources.length });
+
+    // Store user message in session
+    session.messages.push({ role: 'user', content: question });
+    session.updatedAt = new Date();
 
     const systemPrompt = `You are Nexus, a Code Analysis Agent with access to a Knowledge Graph. Your responses MUST be grounded.
 
@@ -215,6 +254,7 @@ ${wikiContext ? wikiContext.slice(0, 3000) : 'No wiki documentation available.'}
       const reader = response.body.getReader();
       let buffer = '';
       let tokenCount = 0;
+      let assistantContent = '';
 
       while (true) {
         if (aborted) { log('warn', 'client aborted stream'); reader.cancel(); break; }
@@ -233,6 +273,7 @@ ${wikiContext ? wikiContext.slice(0, 3000) : 'No wiki documentation available.'}
             const delta = parsed.choices?.[0]?.delta?.content;
             if (delta) {
               tokenCount++;
+              assistantContent += delta;
               res.write(`data: ${JSON.stringify({ type: 'token', content: delta })}\n\n`);
             }
           } catch {
@@ -241,7 +282,11 @@ ${wikiContext ? wikiContext.slice(0, 3000) : 'No wiki documentation available.'}
         }
       }
 
-      log('info', `stream complete`, { tokens: tokenCount });
+      log('info', `stream complete`, { tokens: tokenCount, sessionId, totalMsgs: session.messages.length });
+      if (assistantContent) {
+        session.messages.push({ role: 'assistant', content: assistantContent });
+        session.updatedAt = new Date();
+      }
       res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
       res.end();
     } catch (err: any) {

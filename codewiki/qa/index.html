@@ -201,7 +201,7 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-seri
         </h1>
       </div>
       <div class="header-right">
-        <button class="btn" onclick="location.href='/api/wiki/'">Wiki</button>
+        <button class="btn" onclick="goToWiki()">Wiki</button>
         <button class="btn" onclick="clearChat()">Clear</button>
         <button class="btn btn-icon" id="themeToggle" onclick="toggleTheme()">🌙</button>
       </div>
@@ -268,6 +268,10 @@ function escapeHtml(str) {
   return d.innerHTML;
 }
 
+function goToWiki() {
+  location.href = currentRepo ? `/codewiki/${encodeURIComponent(currentRepo)}` : '/api/wiki/';
+}
+
 function scrollToBottom() {
   mainScroll.scrollTop = mainScroll.scrollHeight;
 }
@@ -275,6 +279,7 @@ function scrollToBottom() {
 // ─── Session block management ───
 let blockCounter = 0;
 let currentBlockId = null;
+let currentSessionId = null;
 
 function createSessionBlock(question) {
   blockCounter++;
@@ -296,7 +301,7 @@ function createSessionBlock(question) {
   block.innerHTML = `
     <div class="block-inner">
       <div class="block-left">
-        <div class="breadcrumb"><a href="/api/wiki/">← Overview</a></div>
+        <div class="breadcrumb"><a href="/codewiki/${encodeURIComponent(currentRepo || '')}">← Overview</a></div>
         <div class="question-title">
           <span class="question-text">${escapeHtml(question)}</span>
           <span class="fast-badge">Fast</span>
@@ -465,7 +470,7 @@ async function sendMessage(e) {
     const resp = await fetch('/api/qa', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: text, history: messages.slice(0, -1), repo: currentRepo }),
+      body: JSON.stringify({ question: text, history: messages.slice(0, -1), repo: currentRepo, sessionId: currentSessionId }),
       signal: abortController.signal,
     });
 
@@ -491,7 +496,12 @@ async function sendMessage(e) {
         if (!trimmed || !trimmed.startsWith('data: ')) continue;
         try {
           const data = JSON.parse(trimmed.slice(6));
-          if (data.type === 'sources') {
+          if (data.type === 'session') {
+            currentSessionId = data.id;
+            const sessionUrl = '/codewiki/qa/' + currentSessionId;
+            history.replaceState(null, '', sessionUrl);
+            logDebug('session created', sessionUrl);
+          } else if (data.type === 'sources') {
             logDebug('sources event', 'count=' + (data.sources?.length ?? 0) + ' blockId=' + currentBlockId);
             if (currentBlockId) {
               populateFileList(currentBlockId, data.sources);
@@ -539,6 +549,7 @@ async function sendMessage(e) {
 function clearChat() {
   messages.length = 0;
   currentBlockId = null;
+  currentSessionId = null;
   blockCounter = 0;
   messagesInner.querySelectorAll('.session-block, .block-separator, .qa-error').forEach(el => el.remove());
   emptyState.style.display = '';
@@ -546,6 +557,7 @@ function clearChat() {
   input.style.height = 'auto';
   updateSendBtn();
   input.focus();
+  history.replaceState(null, '', '/codewiki/qa');
 }
 
 function askSuggestion(text) {
@@ -565,8 +577,9 @@ async function copyAnswer(blockId) {
 async function shareBlock(blockId) {
   const block = document.getElementById(blockId);
   if (!block) return;
-  const qText = block.querySelector('.question-text')?.textContent || '';
-  const url = location.origin + location.pathname + '?q=' + encodeURIComponent(qText);
+  const url = currentSessionId
+    ? location.origin + '/codewiki/qa/' + currentSessionId
+    : location.href;
   try {
     await navigator.clipboard.writeText(url);
   } catch {}
@@ -602,12 +615,48 @@ if (savedTheme === 'dark') {
   document.getElementById('themeToggle').textContent = '☀️';
 }
 
-const pageParams = new URLSearchParams(location.search);
-const currentRepo = pageParams.get('repo') || undefined;
+// Extract repo from query param (?repo=)
+let currentRepo = new URLSearchParams(location.search).get('repo') || undefined;
+
+// Extract session ID from path (/codewiki/qa/123)
+const sessionMatch = location.pathname.match(/^\/codewiki\/qa\/(\d+)/);
+const currentSessionIdFromUrl = sessionMatch?.[1] || null;
+
+// ─── Restore session ───
+async function restoreSession(sessionId) {
+  currentSessionId = sessionId;
+  try {
+    const resp = await fetch('/api/qa/session/' + sessionId);
+    if (!resp.ok) return;
+    const session = await resp.json();
+    if (!session.messages || session.messages.length === 0) return;
+    // Use repo from session data (overrides ?repo= from URL)
+    if (session.repo) currentRepo = session.repo;
+    // Replay messages as session blocks
+    for (let i = 0; i < session.messages.length; i += 2) {
+      const userMsg = session.messages[i];
+      const asstMsg = session.messages[i + 1];
+      if (userMsg?.role !== 'user') continue;
+      createSessionBlock(userMsg.content);
+      if (asstMsg?.role === 'assistant') {
+        updateAnswerContent('block-' + blockCounter, asstMsg.content);
+      }
+    }
+    // Push replayed messages into the messages array
+    for (const m of session.messages) {
+      messages.push(m);
+    }
+  } catch {}
+}
+
+if (currentSessionIdFromUrl) {
+  // Restore existing session
+  restoreSession(currentSessionIdFromUrl);
+}
 
 const params = new URLSearchParams(location.search);
 const initialQ = params.get('q');
-if (initialQ) {
+if (initialQ && !currentSessionIdFromUrl) {
   input.value = initialQ;
   updateSendBtn();
   sendMessage(new Event('submit', { cancelable: true }));

@@ -1,7 +1,7 @@
-<!-- version: 1.7.0 -->
-<!-- Last updated: 2026-04-23 -->
+<!-- version: 1.8.0 -->
+<!-- Last updated: 2026-05-21 -->
 
-Last reviewed: 2026-04-23
+Last reviewed: 2026-05-21
 
 **Project:** GitNexus · **Environment:** dev · **Maintainer:** repository maintainers (see GitHub)
 
@@ -9,7 +9,7 @@ Last reviewed: 2026-04-23
 
 | Boundary | Rule |
 |----------|------|
-| **Reads** | `gitnexus/`, `gitnexus-web/`, `eval/`, plugin packages, `.github/`, `.gitnexus/`, docs. |
+| **Reads** | `gitnexus/`, `gitnexus-web/`, `codewiki/`, `eval/`, plugin packages, `.github/`, `.gitnexus/`, docs. |
 | **Writes** | Only paths required for the change; keep diffs minimal. Update lockfiles when deps change. |
 | **Executes** | `npm`, `npx`, `node` under `gitnexus/` and `gitnexus-web/`; `uv run` for Python under `eval/`; documented CI/dev workflows. |
 | **Off-limits** | Real `.env` / secrets, production credentials, unrelated repos, destructive git ops without confirmation. |
@@ -44,10 +44,41 @@ Commands and gotchas live under **Repo reference** below and in **[CONTRIBUTING.
 - **Cursor:** `.cursor/index.mdc` (always-on); `.cursor/rules/*.mdc` (glob-scoped). Legacy `.cursorrules` deprecated.
 - **GitNexus:** skills in `.claude/skills/gitnexus/`; MCP rules in `gitnexus:start` block below.
 
+## CodeWiki (Q&A / Wiki)
+
+The `codewiki/` directory implements a DeepWiki-style Q&A and wiki viewer. It does NOT use the GitNexus MCP tool chain — it's a separate Express 5 route set (`/wiki/`, `/qa/`, `/api/qa`, `/vendor/`).
+
+### Workflow
+
+```bash
+# 1. Analyze a repo (build knowledge graph)
+cd gitnexus && npx tsx src/cli/index.ts analyze --path /tmp/example
+
+# 2. Generate wiki pages from the graph
+cd gitnexus && npx tsx src/cli/index.ts wiki --path /tmp/example --lang chinese
+
+# 3. Start the server with wiki + Q&A
+bash codewiki/start.sh
+
+# 4. Open in browser
+#    Wiki:   http://localhost:4747/codewiki/example
+#    Q&A:    http://localhost:4747/codewiki/qa?repo=example
+```
+
+### Gotchas
+
+- **LD_PRELOAD**: System `libstdc++.so.6` is too old for tree-sitter native bindings. `codewiki/start.sh` sets it automatically. Manual override: `export LD_PRELOAD=$HOME/node-v24.13.0-linux-x64/lib/libstdc++.so.6`
+- **`npm run serve` trap**: Running `npm run serve` in `gitnexus/` uses `npx tsx` which may download the wrong version. Always use `./node_modules/.bin/tsx` or `codewiki/start.sh`.
+- **Server restart needed**: Changes to `codewiki/server/qa-endpoint.ts` require a restart; `codewiki/qa/index.html` changes are picked up on refresh.
+- **Q&A API key**: Configured in `~/.gitnexus/config.json` (uses GLM-4.7 via bigmodel.cn by default). Fallback: `GITNEXUS_API_KEY` env var.
+- **Logging**: Set `GITNEXUS_LOG_LEVEL=debug` for verbose Q&A endpoint logs (token parsing, search results).
+- **CDN**: All vendor JS (marked, highlight.js, mermaid) is downloaded locally to `codewiki/vendor/` — no external CDN dependency.
+
 ## Changelog
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-05-21 | 1.8.0 | Added CodeWiki Q&A workflow section, LD_PRELOAD gotcha, `npm run serve` trap. Updated scopes to include `codewiki/`. |
 | 2026-04-23 | 1.7.0 | TypeScript added to `MIGRATED_LANGUAGES` (registry-primary call resolution by default). |
 | 2026-04-20 | 1.6.0 | Added scope-resolution pipeline pointer (RFC #909 Ring 3); Python migrated to registry-primary. |
 | 2026-04-19 | 1.5.0 | Cross-repo impact (#794): `impact`/`query`/`context` accept `repo: "@<group>"` + `service`. Removed `group_query`/`group_contracts`/`group_status` MCP tools; added `gitnexus://group/{name}/contracts` and `gitnexus://group/{name}/status` resources. |
@@ -142,6 +173,7 @@ This project is indexed by GitNexus as **GitNexus** (26675 symbols, 35395 relati
 cd gitnexus && npm run dev                 # CLI: tsx watch mode
 cd gitnexus-web && npm run dev             # Web UI: Vite on port 5173
 npx gitnexus serve                         # HTTP API on port 4747 (from any indexed repo)
+bash codewiki/start.sh                     # Start server with wiki + Q&A (sets LD_PRELOAD for tree-sitter)
 ```
 
 ### Testing
