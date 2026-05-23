@@ -26,6 +26,21 @@ const FLUSH_EVERY = 500;
 // CSV ESCAPE UTILITIES
 // ============================================================================
 
+const CJK_REGEX = /[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff\u3000-\u303f\uff00-\uffef]+/g;
+
+/** Insert space between each pair of adjacent CJK characters so the
+ *  whitespace-based DuckDB FTS tokenizer can produce meaningful tokens. */
+export const bigramCJK = (str: string): string => {
+  return str.replace(CJK_REGEX, (match) => {
+    if (match.length <= 2) return match;
+    const grams: string[] = [];
+    for (let i = 0; i < match.length - 1; i++) {
+      grams.push(match.substring(i, i + 2));
+    }
+    return grams.join(' ');
+  });
+};
+
 export const sanitizeUTF8 = (str: string): string => {
   return str
     .replace(/\r\n/g, '\n')
@@ -121,25 +136,27 @@ const extractContent = async (node: GraphNode, contentCache: FileContentCache): 
   if (node.label === 'Folder') return '';
   if (isBinaryContent(content)) return '[Binary file - content not stored]';
 
+  let raw: string;
   if (node.label === 'File') {
     const MAX_FILE_CONTENT = 10000;
-    return content.length > MAX_FILE_CONTENT
+    raw = content.length > MAX_FILE_CONTENT
       ? content.slice(0, MAX_FILE_CONTENT) + '\n... [truncated]'
       : content;
+  } else {
+    const startLine = node.properties.startLine;
+    const endLine = node.properties.endLine;
+    if (startLine === undefined || endLine === undefined) return '';
+
+    const lines = content.split('\n');
+    const start = Math.max(0, startLine - 2);
+    const end = Math.min(lines.length - 1, endLine + 2);
+    const snippet = lines.slice(start, end + 1).join('\n');
+    const MAX_SNIPPET = 5000;
+    raw = snippet.length > MAX_SNIPPET
+      ? snippet.slice(0, MAX_SNIPPET) + '\n... [truncated]'
+      : snippet;
   }
-
-  const startLine = node.properties.startLine;
-  const endLine = node.properties.endLine;
-  if (startLine === undefined || endLine === undefined) return '';
-
-  const lines = content.split('\n');
-  const start = Math.max(0, startLine - 2);
-  const end = Math.min(lines.length - 1, endLine + 2);
-  const snippet = lines.slice(start, end + 1).join('\n');
-  const MAX_SNIPPET = 5000;
-  return snippet.length > MAX_SNIPPET
-    ? snippet.slice(0, MAX_SNIPPET) + '\n... [truncated]'
-    : snippet;
+  return bigramCJK(raw);
 };
 
 // ============================================================================
@@ -336,7 +353,7 @@ export const streamAllCSVsToDisk = async (
         await fileWriter.addRow(
           [
             escapeCSVField(node.id),
-            escapeCSVField(node.properties.name || ''),
+            escapeCSVField(bigramCJK(node.properties.name || '')),
             escapeCSVField(node.properties.filePath || ''),
             escapeCSVField(content),
           ].join(','),
@@ -347,7 +364,7 @@ export const streamAllCSVsToDisk = async (
         await folderWriter.addRow(
           [
             escapeCSVField(node.id),
-            escapeCSVField(node.properties.name || ''),
+            escapeCSVField(bigramCJK(node.properties.name || '')),
             escapeCSVField(node.properties.filePath || ''),
           ].join(','),
         );
@@ -358,7 +375,7 @@ export const streamAllCSVsToDisk = async (
         await communityWriter.addRow(
           [
             escapeCSVField(node.id),
-            escapeCSVField(node.properties.name || ''),
+            escapeCSVField(bigramCJK(node.properties.name || '')),
             escapeCSVField(node.properties.heuristicLabel || ''),
             keywordsStr,
             escapeCSVField(node.properties.description || ''),
@@ -375,7 +392,7 @@ export const streamAllCSVsToDisk = async (
         await processWriter.addRow(
           [
             escapeCSVField(node.id),
-            escapeCSVField(node.properties.name || ''),
+            escapeCSVField(bigramCJK(node.properties.name || '')),
             escapeCSVField(node.properties.heuristicLabel || ''),
             escapeCSVField(node.properties.processType || ''),
             escapeCSVNumber(node.properties.stepCount, 0),
@@ -391,7 +408,7 @@ export const streamAllCSVsToDisk = async (
         await methodWriter.addRow(
           [
             escapeCSVField(node.id),
-            escapeCSVField(node.properties.name || ''),
+            escapeCSVField(bigramCJK(node.properties.name || '')),
             escapeCSVField(node.properties.filePath || ''),
             escapeCSVNumber(node.properties.startLine, -1),
             escapeCSVNumber(node.properties.endLine, -1),
@@ -409,7 +426,7 @@ export const streamAllCSVsToDisk = async (
         await sectionWriter.addRow(
           [
             escapeCSVField(node.id),
-            escapeCSVField(node.properties.name || ''),
+            escapeCSVField(bigramCJK(node.properties.name || '')),
             escapeCSVField(node.properties.filePath || ''),
             escapeCSVNumber(node.properties.startLine, -1),
             escapeCSVNumber(node.properties.endLine, -1),
@@ -432,7 +449,7 @@ export const streamAllCSVsToDisk = async (
         await routeWriter.addRow(
           [
             escapeCSVField(node.id),
-            escapeCSVField(node.properties.name || ''),
+            escapeCSVField(bigramCJK(node.properties.name || '')),
             escapeCSVField(node.properties.filePath || ''),
             escapeCSVField(keysStr),
             escapeCSVField(errorKeysStr),
@@ -445,7 +462,7 @@ export const streamAllCSVsToDisk = async (
         await toolWriter.addRow(
           [
             escapeCSVField(node.id),
-            escapeCSVField(node.properties.name || ''),
+            escapeCSVField(bigramCJK(node.properties.name || '')),
             escapeCSVField(node.properties.filePath || ''),
             escapeCSVField(node.properties.description || ''),
           ].join(','),
@@ -459,7 +476,7 @@ export const streamAllCSVsToDisk = async (
           await writer.addRow(
             [
               escapeCSVField(node.id),
-              escapeCSVField(node.properties.name || ''),
+              escapeCSVField(bigramCJK(node.properties.name || '')),
               escapeCSVField(node.properties.filePath || ''),
               escapeCSVNumber(node.properties.startLine, -1),
               escapeCSVNumber(node.properties.endLine, -1),
@@ -476,7 +493,7 @@ export const streamAllCSVsToDisk = async (
             await mlWriter.addRow(
               [
                 escapeCSVField(node.id),
-                escapeCSVField(node.properties.name || ''),
+                escapeCSVField(bigramCJK(node.properties.name || '')),
                 escapeCSVField(node.properties.filePath || ''),
                 escapeCSVNumber(node.properties.startLine, -1),
                 escapeCSVNumber(node.properties.endLine, -1),

@@ -7,6 +7,7 @@
 
 import { queryFTS } from '../lbug/lbug-adapter.js';
 import { FTS_INDEXES } from './fts-schema.js';
+import { bigramCJK } from '../lbug/csv-generator.js';
 
 export interface BM25SearchResult {
   filePath: string;
@@ -67,10 +68,11 @@ async function queryFTSViaExecutor(
  * @returns Ranked search results from FTS indexes
  */
 export const searchFTSFromLbug = async (
-  query: string,
+  rawQuery: string,
   limit: number = 20,
   repoId?: string,
 ): Promise<FTSSearchResponse> => {
+  const query = bigramCJK(rawQuery);
   const resultsByIndex: any[][] = [];
   let queriesSucceeded = 0;
 
