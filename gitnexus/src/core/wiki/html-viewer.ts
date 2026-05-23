@@ -119,6 +119,15 @@ function buildHTML(
   parts.push('</main>');
   parts.push('</div>');
 
+  // Q&A input bar (fixed bottom)
+  var qaPath = '/codewiki/' + encodeURIComponent(projectName) + '/qa';
+  parts.push('<div class="qa-entry">');
+  parts.push('  <form action="' + qaPath + '" method="GET" class="qa-form">');
+  parts.push('    <input type="text" name="q" placeholder="Ask anything about this codebase..." autocomplete="off">');
+  parts.push('    <button type="submit">Ask</button>');
+  parts.push('  </form>');
+  parts.push('</div>');
+
   // ── Script ──
   parts.push('<script>');
   parts.push('var PAGES = ' + pagesJSON + ';');
@@ -210,6 +219,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 }
 .empty-state{text-align:center;padding:80px 20px;color:var(--text-muted)}
 .empty-state h2{font-size:20px;margin-bottom:8px;border:none}
+
+.qa-entry{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:100%;max-width:740px;z-index:20;padding:0 16px}
+.qa-form{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:8px 12px;box-shadow:0 4px 24px rgba(0,0,0,.06)}
+.qa-form input[type="text"]{flex:1;border:none;background:transparent;outline:none;font-size:14px;font-family:inherit;color:var(--text);padding:4px 0;line-height:1.5}
+.qa-form input[type="text"]::placeholder{color:var(--text-muted)}
+.qa-form button{padding:8px 20px;background:var(--primary);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;transition:opacity .15s;white-space:nowrap;flex-shrink:0}
+.qa-form button:hover{opacity:.88}
 `;
 
 // The client-side JS is kept as a plain string to avoid template literal conflicts

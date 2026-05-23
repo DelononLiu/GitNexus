@@ -1827,6 +1827,137 @@ export const createServer = async (port: number, host: string = '127.0.0.1') => 
     res.json({ id: job.id, status: 'failed', error: 'Cancelled by user' });
   });
 
+  // ── CodeWiki (Q&A + Wiki static pages) ──────────────────────────────
+
+  let createQaEndpointFn: ((...args: any[]) => any) | null = null;
+  let getSessionFn: ((id: string) => any) | null = null;
+  let resolveLLMConfigFn: (() => any) | null = null;
+  try {
+    const qaMod = await import(new URL('../../../codewiki/server/qa-endpoint.js', import.meta.url).href);
+    createQaEndpointFn = qaMod.createQaEndpoint;
+    getSessionFn = qaMod.getSession;
+    const llmMod = await import('../core/wiki/llm-client.js');
+    resolveLLMConfigFn = llmMod.resolveLLMConfig;
+  } catch (e) {
+    console.warn('[codewiki] Q&A module not available:', (e as Error)?.message ?? e);
+  }
+
+  // Resolve codewiki asset paths relative to this source file.
+  // api.ts is at gitnexus/src/server/, project root is ../../../ from there.
+  const qaIndexFile = fileURLToPath(new URL('../../../codewiki/qa/index.html', import.meta.url));
+  const vendorDir = fileURLToPath(new URL('../../../codewiki/vendor', import.meta.url));
+
+  async function sendQaPage(req: any, res: any) {
+    try {
+      const content = await fs.readFile(qaIndexFile, 'utf-8');
+      res.type('html').send(content);
+    } catch {
+      res.status(404).type('text').send('Q&A page not found at ' + qaIndexFile);
+    }
+  }
+
+  app.use((req, res, next) => {
+    if (req.path === '/qa' || req.path === '/qa/') {
+      return sendQaPage(req, res);
+    }
+    next();
+  });
+  app.use('/vendor', async (req, res, next) => {
+    const filePath = path.join(vendorDir, req.path.replace(/^\//, ''));
+    if (!filePath.startsWith(vendorDir)) return res.status(403).end();
+    try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      const ext = path.extname(filePath);
+      const ct = ext === '.js' ? 'application/javascript' : ext === '.css' ? 'text/css' : 'application/octet-stream';
+      res.type(ct).send(content);
+    } catch { next(); }
+  });
+
+  // Serve Wiki static files (per-repo, from storagePath/wiki/)
+  app.use('/wiki', async (req, res, next) => {
+    const repoName = typeof req.query.repo === 'string' ? req.query.repo : undefined;
+    const entry = await resolveRepo(repoName).catch(() => null);
+    if (!entry) return next();
+    const wikiDir = path.join(entry.storagePath, 'wiki');
+    const relPath = req.path.replace(/^\//, '') || 'index.html';
+    const filePath = path.join(wikiDir, relPath);
+    if (!filePath.startsWith(wikiDir)) return res.status(403).end();
+    try {
+      let content = await fs.readFile(filePath, 'utf-8');
+      if (relPath === 'index.html' || relPath.endsWith('.html')) {
+        content = content
+          .replace(/https:\/\/cdn\.jsdelivr\.net\/npm\/marked@[^/]+\/marked\.min\.js/g, '/vendor/marked.min.js')
+          .replace(/https:\/\/cdn\.jsdelivr\.net\/npm\/mermaid@[^/]+\/dist\/mermaid\.min\.js/g, '/vendor/mermaid.min.js')
+          .replace(/https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/highlight\.js\/[^/]+\/highlight\.min\.css/g, '');
+      }
+      const ext = path.extname(filePath).toLowerCase();
+      const ct = ext === '.html' ? 'text/html' : ext === '.md' ? 'text/markdown' : ext === '.json' ? 'application/json' : 'application/octet-stream';
+      res.type(ct).send(content);
+    } catch {
+      if (relPath === 'index.html') {
+        res.status(404).type('text').send('Wiki not found. Run `gitnexus wiki` first.');
+      } else {
+        next();
+      }
+    }
+  });
+
+  // Q&A API: SSE streaming LLM endpoint
+  if (createQaEndpointFn && resolveLLMConfigFn) {
+    const searchCodebase = async (query: string, repoName?: string) => {
+      const entry = await resolveRepo(repoName);
+      if (!entry) return [];
+      const lbugPath = path.join(entry.storagePath, 'lbug');
+      return await withLbugDb(lbugPath, async () => {
+        const { hybridSearch: hs } = await import('../core/search/hybrid-search.js');
+        const { isEmbedderReady } = await import('../core/embeddings/embedder.js');
+        if (isEmbedderReady()) {
+          const { semanticSearch: semSearch } = await import(
+            '../core/embeddings/embedding-pipeline.js'
+          );
+          return await hs(query, 10, executeQuery, semSearch);
+        }
+        const { searchFTSFromLbug } = await import('../core/search/bm25-index.js');
+        const fts = await searchFTSFromLbug(query, 10);
+        return fts.results;
+      });
+    };
+    app.post('/api/qa', createQaEndpointFn(resolveRepo, resolveLLMConfigFn, searchCodebase));
+  }
+
+  // DeepWiki-style URL routes
+  app.get('/codewiki/:repo/qa', sendQaPage);
+  app.get('/codewiki/qa/:id', sendQaPage);
+
+  if (getSessionFn) {
+    app.get('/api/qa/session/:id', (req, res) => {
+      const session = getSessionFn!(req.params.id);
+      if (!session) { res.status(404).json({ error: 'Session not found' }); return; }
+      res.json({ id: session.id, messages: session.messages, repo: session.repo, createdAt: session.createdAt });
+    });
+  }
+
+  app.get('/codewiki/:repo', async (req, res) => {
+    const repoName = req.params.repo;
+    const entry = await resolveRepo(repoName).catch(() => null);
+    if (!entry) {
+      res.status(404).type('text').send('Repo "' + repoName + '" not found. Run `gitnexus analyze --path <path>` first.');
+      return;
+    }
+    const wikiDir = path.join(entry.storagePath, 'wiki');
+    const indexPath = path.join(wikiDir, 'index.html');
+    try {
+      let content = await fs.readFile(indexPath, 'utf-8');
+      content = content
+        .replace(/https:\/\/cdn\.jsdelivr\.net\/npm\/marked@[^/]+\/marked\.min\.js/g, '/vendor/marked.min.js')
+        .replace(/https:\/\/cdn\.jsdelivr\.net\/npm\/mermaid@[^/]+\/dist\/mermaid\.min\.js/g, '/vendor/mermaid.min.js')
+        .replace(/https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/highlight\.js\/[^/]+\/highlight\.min\.css/g, '');
+      res.type('html').send(content);
+    } catch {
+      res.status(404).type('text').send('Wiki not found. Run `gitnexus wiki` first.');
+    }
+  });
+
   // ── Web UI (served at root) ───────────────────────────────────────
 
   // Resolve the gitnexus-web dist directory relative to this file's location.
