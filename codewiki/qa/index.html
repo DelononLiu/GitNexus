@@ -332,6 +332,25 @@ function populateFileList(blockId, sources) {
     return;
   }
 
+  // Filter snippet to only show lines within startLine-endLine range
+  function filterSnippetLines(snippet, startLine, endLine) {
+    if (!snippet || !startLine) return snippet;
+    const lines = snippet.split('\n');
+    const filtered = [];
+    for (const line of lines) {
+      const match = line.match(/^(\d+):/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num >= startLine && (!endLine || num <= endLine)) {
+          filtered.push(line);
+        }
+      } else {
+        filtered.push(line);
+      }
+    }
+    return filtered.join('\n');
+  }
+
   let html = '';
   for (let i = 0; i < sources.length; i++) {
     const src = sources[i];
@@ -340,14 +359,15 @@ function populateFileList(blockId, sources) {
       : '';
     const fid = blockId + '-f' + i;
     const sid = blockId + '-s' + i;
-    html += '<div class="file-list-item" onclick="toggleFile(\'' + fid + '\')" id="' + fid + '">';
+    const filteredSnippet = filterSnippetLines(src.snippet, src.startLine, src.endLine);
+    html += '<div class="file-list-item expanded" onclick="toggleFile(\'' + fid + '\')" id="' + fid + '">';
     html += '<span class="expand-icon">\u25b6</span>';
     html += '<span class="file-item-name">' + escapeHtml(src.fileName) + '</span>';
     html += '<span class="file-item-path">' + escapeHtml(src.filePath) + '</span>';
     if (lineLabel) html += '<span class="file-item-lines">' + lineLabel + '</span>';
     html += '</div>';
-    html += '<div class="file-list-snippet" id="' + sid + '">';
-    html += src.snippet ? renderSnippet(src.snippet) : '<div class="file-list-empty" style="padding:8px 14px">No preview</div>';
+    html += '<div class="file-list-snippet" style="display:block" id="' + sid + '">';
+    html += filteredSnippet ? renderSnippet(filteredSnippet) : '<div class="file-list-empty" style="padding:8px 14px">No preview</div>';
     html += '</div>';
   }
   container.innerHTML = html;
