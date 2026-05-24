@@ -1,7 +1,7 @@
-<!-- version: 1.7.0 -->
-<!-- Last updated: 2026-04-23 -->
+<!-- version: 1.8.0 -->
+<!-- Last updated: 2026-05-24 -->
 
-Last reviewed: 2026-04-23
+Last reviewed: 2026-05-24
 
 **Project:** GitNexus · **Environment:** dev · **Maintainer:** repository maintainers (see GitHub)
 
@@ -9,8 +9,8 @@ Last reviewed: 2026-04-23
 
 | Boundary | Rule |
 |----------|------|
-| **Reads** | `gitnexus/`, `gitnexus-web/`, `eval/`, plugin packages, `.github/`, `.gitnexus/`, docs. |
-| **Writes** | Only paths required for the change; keep diffs minimal. Update lockfiles when deps change. |
+| **Reads** | `gitnexus/`, `gitnexus-web/`, `codewiki/`, `eval/`, plugin packages, `.github/`, `.gitnexus/`, docs. |
+| **Writes** | CodeWiki features **MUST** be added inside `codewiki/` first. Only modify `gitnexus/` or `gitnexus-web/` when no existing codewiki interface serves the need (e.g. adding server routes, injecting DOM). Keep diffs minimal. Update lockfiles when deps change. |
 | **Executes** | `npm`, `npx`, `node` under `gitnexus/` and `gitnexus-web/`; `uv run` for Python under `eval/`; documented CI/dev workflows. |
 | **Off-limits** | Real `.env` / secrets, production credentials, unrelated repos, destructive git ops without confirmation. |
 
@@ -48,6 +48,7 @@ Commands and gotchas live under **Repo reference** below and in **[CONTRIBUTING.
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-05-24 | 1.8.0 | Added CodeWiki scope boundary: new features MUST go in `codewiki/` first; only modify `gitnexus/`/`gitnexus-web/` when necessary. |
 | 2026-04-23 | 1.7.0 | TypeScript added to `MIGRATED_LANGUAGES` (registry-primary call resolution by default). |
 | 2026-04-20 | 1.6.0 | Added scope-resolution pipeline pointer (RFC #909 Ring 3); Python migrated to registry-primary. |
 | 2026-04-19 | 1.5.0 | Cross-repo impact (#794): `impact`/`query`/`context` accept `repo: "@<group>"` + `service`. Removed `group_query`/`group_contracts`/`group_status` MCP tools; added `gitnexus://group/{name}/contracts` and `gitnexus://group/{name}/status` resources. |
@@ -131,6 +132,7 @@ This project is indexed by GitNexus as **GitNexus** (26675 symbols, 35395 relati
 |---------|------|---------|
 | **CLI/Core** | `gitnexus/` | TypeScript CLI, indexing pipeline, MCP server. Published to npm. |
 | **Web UI** | `gitnexus-web/` | React/Vite thin client. All queries via `gitnexus serve` HTTP API. |
+| **CodeWiki** | `codewiki/` | DeepWiki-style Q&A pages, standalone HTML, SSE endpoints, vendor CDN. |
 | **Shared** | `gitnexus-shared/` | Shared TypeScript types and constants. |
 | Claude Plugin | `gitnexus-claude-plugin/` | Static config for Claude marketplace. |
 | Cursor Integration | `gitnexus-cursor-integration/` | Static config for Cursor editor. |

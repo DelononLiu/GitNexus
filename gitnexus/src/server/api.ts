@@ -1845,6 +1845,7 @@ export const createServer = async (port: number, host: string = '127.0.0.1') => 
   // Resolve codewiki asset paths relative to this source file.
   // api.ts is at gitnexus/src/server/, project root is ../../../ from there.
   const qaIndexFile = fileURLToPath(new URL('../../../codewiki/qa/index.html', import.meta.url));
+  const landingIndexFile = fileURLToPath(new URL('../../../codewiki/landing/index.html', import.meta.url));
   const vendorDir = fileURLToPath(new URL('../../../codewiki/vendor', import.meta.url));
 
   async function sendQaPage(req: any, res: any) {
@@ -1925,7 +1926,18 @@ export const createServer = async (port: number, host: string = '127.0.0.1') => 
     app.post('/api/qa', createQaEndpointFn(resolveRepo, resolveLLMConfigFn, searchCodebase));
   }
 
+  async function sendLandingPage(req: any, res: any) {
+    try {
+      const content = await fs.readFile(landingIndexFile, 'utf-8');
+      res.type('html').send(content);
+    } catch {
+      res.status(404).type('text').send('Landing page not found at ' + landingIndexFile);
+    }
+  }
+
   // DeepWiki-style URL routes
+  app.get('/codewiki', sendLandingPage);
+  app.get('/codewiki/', sendLandingPage);
   app.get('/codewiki/:repo/qa', sendQaPage);
   app.get('/codewiki/qa/:id', sendQaPage);
 
