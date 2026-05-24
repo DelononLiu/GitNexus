@@ -16,7 +16,7 @@ cd gitnexus
 # 方式 A：用 dist 测试（推荐，不受 tsx 兼容性影响）
 node scripts/build.js
 LD_LIBRARY_PATH=`pwd`/../codewiki/lib/ node dist/cli/index.js analyze /some/repo
-LD_LIBRARY_PATH=`pwd`/../codewiki/lib/ node dist/cli/index.js wiki /some/repo
+LD_LIBRARY_PATH=`pwd`/../codewiki/lib/ node dist/cli/index.js wiki --lang chinese /some/repo
 LD_LIBRARY_PATH=`pwd`/../codewiki/lib/ npm run serve
 
 

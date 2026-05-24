@@ -29,15 +29,17 @@ const FLUSH_EVERY = 500;
 const CJK_REGEX = /[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff\u3000-\u303f\uff00-\uffef]+/g;
 
 /** Insert space between each pair of adjacent CJK characters so the
- *  whitespace-based DuckDB FTS tokenizer can produce meaningful tokens. */
+ *  whitespace-based DuckDB FTS tokenizer can produce meaningful tokens.
+ *  Always wrap CJK runs with spaces to ensure clean separation from
+ *  adjacent non-CJK text (which the tokenizer would otherwise glue on). */
 export const bigramCJK = (str: string): string => {
   return str.replace(CJK_REGEX, (match) => {
-    if (match.length <= 2) return match;
+    if (match.length <= 2) return ' ' + match + ' ';
     const grams: string[] = [];
     for (let i = 0; i < match.length - 1; i++) {
       grams.push(match.substring(i, i + 2));
     }
-    return grams.join(' ');
+    return ' ' + grams.join(' ') + ' ';
   });
 };
 
