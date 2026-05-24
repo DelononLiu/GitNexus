@@ -256,6 +256,11 @@ function scrollToBottom() {
   mainScroll.scrollTop = mainScroll.scrollHeight;
 }
 
+function scrollToElement(el) {
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 let blockCounter = 0;
 let currentBlockId = null;
 let currentSessionId = null;
@@ -303,7 +308,7 @@ function createSessionBlock(question) {
     </div>
   `;
   messagesInner.appendChild(block);
-  scrollToBottom();
+  scrollToElement(block.querySelector('.question-text'));
   return blockId;
 }
 
@@ -395,7 +400,6 @@ function setTyping(typing) {
   indicator.id = 'assistantTyping';
   indicator.innerHTML = '<span></span><span></span><span></span>';
   answerEl.appendChild(indicator);
-  scrollToBottom();
 }
 
 function updateAnswerContent(blockId, content) {
@@ -409,7 +413,6 @@ function updateAnswerContent(blockId, content) {
   answerEl.querySelectorAll('pre code').forEach((block) => {
     hljs.highlightElement(block);
   });
-  scrollToBottom();
 }
 
 function updateSendBtn() {
