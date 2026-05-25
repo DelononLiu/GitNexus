@@ -74,8 +74,9 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-seri
 
 .session-block{padding:28px 0 8px}
 .block-inner{display:flex;gap:28px}
-.block-left{flex:2;min-width:0;background:var(--bg-surface);border:0.5px solid var(--color-border);border-radius:8px;padding:16px}
+.block-left{flex:2;min-width:0}
 .block-right{flex:3;min-width:0}
+.answer-card{background:var(--bg-surface);border:0.5px solid var(--color-border);border-radius:8px;padding:16px;margin-top:12px}
 
 .block-separator{height:1px;background:var(--color-border)}
 
@@ -84,9 +85,8 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-seri
 .breadcrumb a:hover{color:var(--color-blue)}
 
 .question-title{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.question-text{font-weight:700;font-size:16px;color:var(--color-text-primary);line-height:1.4}
+.question-text{font-weight:700;font-size:18px;color:var(--color-text-primary);line-height:1.4}
 .fast-badge{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.3px;padding:2px 8px;border-radius:999px;background:var(--bg-secondary);color:var(--color-text-secondary);white-space:nowrap;flex-shrink:0}
-.qa-divider{height:1px;background:var(--color-border);margin:10px 0 14px}
 
 .answer-content{font-size:14px;line-height:1.7;word-wrap:break-word}
 .answer-content p{margin:8px 0}
@@ -125,7 +125,7 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-seri
 .file-item-name{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .file-item-path{font-size:11px;color:var(--color-text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
 .file-item-lines{font-size:10px;color:var(--color-text-secondary);background:var(--bg-secondary);padding:1px 7px;border-radius:8px;white-space:nowrap;flex-shrink:0}
-.file-list-item+.file-list-item{border-top:0.5px solid var(--color-border)}
+.file-list-item+.file-list-item{margin-top:8px;border-top:0.5px solid var(--color-border)}
 .file-list-snippet{display:none;background:var(--color-code-bg);border-top:0.5px solid var(--color-code-border)}
 .file-list-empty{padding:14px;font-size:13px;color:var(--color-text-secondary);text-align:center}
 
@@ -291,15 +291,16 @@ function createSessionBlock(question) {
           <span class="question-text">${escapeHtml(question)}</span>
           <span class="fast-badge">Fast</span>
         </div>
-        <div class="qa-divider"></div>
-        <div class="answer-content" id="answer-${blockId}"></div>
-        <div class="answer-actions">
-          <button class="action-btn" onclick="copyAnswer('${blockId}')" title="Copy answer">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-          </button>
-          <button class="action-btn" onclick="shareBlock('${blockId}')" title="Share this Q&A">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-          </button>
+        <div class="answer-card">
+          <div class="answer-content" id="answer-${blockId}"></div>
+          <div class="answer-actions">
+            <button class="action-btn" onclick="copyAnswer('${blockId}')" title="Copy answer">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+            <button class="action-btn" onclick="shareBlock('${blockId}')" title="Share this Q&A">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+            </button>
+          </div>
         </div>
       </div>
       <div class="block-right">
