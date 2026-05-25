@@ -127,10 +127,17 @@ export function validateLLMBaseUrl(baseUrl: string): void {
     // Node's URL parser preserves IPv6 brackets in hostname (e.g. "[::1]"),
     // so strip them before comparing to bare address literals.
     const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '');
-    if (host !== 'localhost' && host !== '127.0.0.1' && host !== '::1') {
+    const allowed =
+      host === 'localhost' ||
+      host === '127.0.0.1' ||
+      host === '::1' ||
+      host.startsWith('10.') ||
+      host.startsWith('192.');
+    if (!allowed) {
       // Use parsed.origin (scheme+host+port, no credentials) instead of the full URL.
       throw new Error(
-        `Insecure http:// LLM base URLs are only allowed for localhost/127.0.0.1. ` +
+        `Insecure http:// LLM base URLs are only allowed for localhost/127.0.0.1 ` +
+          `and private network IPs (10.x.x.x, 192.x.x.x). ` +
           `Use https:// for remote endpoints (got ${parsed.origin})`,
       );
     }

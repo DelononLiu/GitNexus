@@ -36,6 +36,7 @@ export interface WikiCommandOptions {
   timeout?: string;
   retries?: string;
   lang?: string;
+  skipGit?: boolean;
 }
 
 function parsePositiveIntegerOption(
@@ -136,18 +137,24 @@ const wikiCommandImpl = async (inputPath?: string, options?: WikiCommandOptions)
   let repoPath: string;
   if (inputPath) {
     repoPath = path.resolve(inputPath);
+  } else if (options?.skipGit) {
+    repoPath = path.resolve(process.cwd());
   } else {
     const gitRoot = getGitRoot(process.cwd());
     if (!gitRoot) {
-      console.log('  Error: Not inside a git repository\n');
+      console.log(
+        '  Error: Not inside a git repository.\n  Tip: pass --skip-git to run without a .git directory.\n',
+      );
       process.exitCode = 1;
       return;
     }
     repoPath = gitRoot;
   }
 
-  if (!isGitRepo(repoPath)) {
-    console.log('  Error: Not a git repository\n');
+  if (!options?.skipGit && !isGitRepo(repoPath)) {
+    console.log(
+      '  Error: Not a git repository.\n  Tip: pass --skip-git to run without a .git directory.\n',
+    );
     process.exitCode = 1;
     return;
   }

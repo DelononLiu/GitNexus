@@ -180,6 +180,10 @@ program
     '--lang <lang>',
     'Output language for generated documentation (e.g. english, chinese, spanish, japanese)',
   )
+  .option(
+    '--skip-git',
+    'Treat cwd as the repo root and skip parent git-root discovery',
+  )
   .action(createLazyAction(() => import('./wiki.js'), 'wikiCommand'));
 
 program
