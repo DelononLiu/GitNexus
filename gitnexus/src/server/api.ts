@@ -1906,21 +1906,79 @@ export const createServer = async (port: number, host: string = '127.0.0.1') => 
   if (createQaEndpointFn && resolveLLMConfigFn) {
     const searchCodebase = async (query: string, repoName?: string) => {
       const entry = await resolveRepo(repoName);
-      if (!entry) return [];
+      if (!entry) return { sources: [] };
+
       const lbugPath = path.join(entry.storagePath, 'lbug');
-      return await withLbugDb(lbugPath, async () => {
-        const { hybridSearch: hs } = await import('../core/search/hybrid-search.js');
-        const { isEmbedderReady } = await import('../core/embeddings/embedder.js');
-        if (isEmbedderReady()) {
-          const { semanticSearch: semSearch } = await import(
-            '../core/embeddings/embedding-pipeline.js'
-          );
-          return await hs(query, 10, executeQuery, semSearch);
+
+      // Two complementary searches run in parallel (Kilo-style multi-tool):
+      //   graph query → architectural context (processes + flows)
+      //   hybrid  search → code-level evidence (file snippets)
+      const [graphResult, hsResults] = await Promise.all([
+        backend.callTool('query', { query, repo: repoName, limit: 3 }).catch(() => null),
+        withLbugDb(lbugPath, async () => {
+          const { hybridSearch: hs } = await import('../core/search/hybrid-search.js');
+          const { isEmbedderReady } = await import('../core/embeddings/embedder.js');
+          if (isEmbedderReady()) {
+            const { semanticSearch: semSearch } = await import(
+              '../core/embeddings/embedding-pipeline.js'
+            );
+            return await hs(query, 10, executeQuery, semSearch);
+          }
+          const { searchFTSFromLbug } = await import('../core/search/bm25-index.js');
+          const fts = await searchFTSFromLbug(query, 10);
+          return fts.results;
+        }).catch(() => null),
+      ]);
+
+      // Merge sources from both strategies, deduplicate by (filePath, startLine)
+      const seen = new Set<string>();
+      const sources: any[] = [];
+
+      if (graphResult) {
+        for (const s of [
+          ...(graphResult.process_symbols ?? []),
+          ...(graphResult.definitions ?? []),
+        ]) {
+          const key = `${s.filePath}:${s.startLine}`;
+          if (seen.has(key) || !s.filePath) continue;
+          seen.add(key);
+          sources.push({
+            label: s.type ?? 'Symbol',
+            name: s.name,
+            filePath: s.filePath,
+            startLine: s.startLine,
+            endLine: s.endLine,
+          });
         }
-        const { searchFTSFromLbug } = await import('../core/search/bm25-index.js');
-        const fts = await searchFTSFromLbug(query, 10);
-        return fts.results;
-      });
+      }
+
+      if (hsResults) {
+        for (const r of hsResults) {
+          const key = `${r.filePath}:${r.startLine}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          sources.push(r);
+        }
+      }
+
+      // Format execution flows (from graph query)
+      let flowsText = '';
+      if (graphResult?.processes?.length > 0) {
+        const lines: string[] = [];
+        for (const p of graphResult.processes) {
+          const symbols = (graphResult.process_symbols ?? [])
+            .filter((s: any) => s.process_id === p.id)
+            .sort((a: any, b: any) => (a.step_index ?? 0) - (b.step_index ?? 0));
+          lines.push(`### ${p.summary || p.label}`);
+          lines.push(`Type: ${p.process_type || 'flow'} · ${symbols.length} steps`);
+          for (const s of symbols) {
+            lines.push(`- \`${s.name}\` (${s.type}) — ${s.filePath}:${s.startLine}`);
+          }
+        }
+        flowsText = lines.join('\n');
+      }
+
+      return { sources: sources.slice(0, 10), flows: flowsText };
     };
     app.post('/api/qa', createQaEndpointFn(resolveRepo, resolveLLMConfigFn, searchCodebase));
   }

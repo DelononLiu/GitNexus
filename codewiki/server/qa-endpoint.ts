@@ -28,6 +28,91 @@ function log(level: 'info' | 'warn' | 'error' | 'debug', msg: string, data?: Rec
   console.error('[' + ts + '] [qa] [' + level + '] ' + line);
 }
 
+type QuestionType = 'overview' | 'feature' | 'debug' | 'compare' | 'api' | 'general';
+
+function classifyQuestion(question: string): QuestionType {
+  const q = question.trim().toLowerCase();
+  if (/^(介绍|什么是|overview|describe|explain|tell me about|what is|架构|architecture|简介)/.test(q)) return 'overview';
+  if (/(区别|差异|vs\b|versus|compared|对比|不同|difference|pros|cons|tradeoff)/.test(q)) return 'compare';
+  if (/(报错|错误|失败|error|fail|bug|crash|exception|为什么|why|原因|cause|解决|fix|排查|trouble)/.test(q)) return 'debug';
+  if (/(函数|方法|api\b|interface|class|function|method|参数|返回|signature|params?|returns?)/.test(q)) return 'api';
+  return 'general';
+}
+
+function structureGuide(type: QuestionType): string {
+  const guides: Record<QuestionType, string[]> = {
+    overview: [
+      '- Start with a 1-sentence summary (no heading).',
+      '- Use ## Architecture with a mermaid diagram for the high-level structure.',
+      '- Use ## Features with a bullet list of key capabilities.',
+      '- Use ## Usage with code blocks for examples.',
+    ],
+    feature: [
+      '- Answer directly (1 sentence, no heading).',
+      '- Use ## Implementation (or ## Details) with key code snippets.',
+      '- Use bullet points for steps or considerations.',
+    ],
+    debug: [
+      '- State the cause directly (1 sentence, no heading).',
+      '- Use ## Root Cause explaining what triggers the issue.',
+      '- Use ## Solution with code blocks for the fix.',
+    ],
+    compare: [
+      '- Start with a 1-sentence verdict (no heading).',
+      '- Use a markdown table for side-by-side comparison.',
+      '- Use ## Analysis explaining trade-offs and when to use each.',
+    ],
+    api: [
+      '- Start with 1 sentence on what it does (no heading).',
+      '- Use ## Signature with the type signature in a code block.',
+      '- Use ## Parameters as a bullet list.',
+      '- Use ## Example with a usage code block.',
+    ],
+    general: [
+      '- Start with a 1-sentence direct answer (no heading).',
+      '- Organize the rest into ## sections by topic.',
+      '- Prefer bullet points and short paragraphs.',
+    ],
+  };
+  return guides[type].join('\n');
+}
+
+function hasChinese(text: string): boolean {
+  return /[\u4e00-\u9fff]/.test(text);
+}
+
+function buildSearchQuery(question: string, translation: string): string {
+  return question + ' ' + translation;
+}
+
+async function translateToEnglish(question: string, llmConfig: any): Promise<string> {
+  try {
+    const baseUrl = llmConfig.baseUrl.replace(/\/+$/, '') + '/chat/completions';
+    const authHeaders =
+      llmConfig.provider === 'azure'
+        ? { 'api-key': llmConfig.apiKey }
+        : { Authorization: 'Bearer ' + llmConfig.apiKey };
+    const res = await fetch(baseUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
+      body: JSON.stringify({
+        model: llmConfig.model,
+        messages: [
+          { role: 'system', content: 'Translate Chinese to English search keywords for code. Keep English names unchanged. Return ONLY keywords.' },
+          { role: 'user', content: question },
+        ],
+        max_tokens: 100,
+        temperature: 0,
+      }),
+    });
+    if (!res.ok) return '';
+    const data = (await res.json()) as any;
+    return data?.choices?.[0]?.message?.content?.trim() || '';
+  } catch {
+    return '';
+  }
+}
+
 export function createQaEndpoint(
   resolveRepo: (repoName?: string) => Promise<{ storagePath: string; name: string } | undefined>,
   resolveLLMConfig: () => Promise<{
@@ -38,7 +123,7 @@ export function createQaEndpoint(
     temperature: number;
     provider?: string;
   }>,
-  search: (query: string, repo?: string) => Promise<any[]>,
+  search: (query: string, repo?: string) => Promise<{ sources: any[]; flows?: string }>,
 ) {
   return async (req: any, res: any) => {
     const question = req.body?.question?.trim();
@@ -69,10 +154,35 @@ export function createQaEndpoint(
       } catch {}
     }
 
+    let llmConfig: any;
+    try {
+      llmConfig = await resolveLLMConfig();
+    } catch (e) {
+      res.status(500).json({
+        error: 'Failed to resolve LLM configuration. Set GITNEXUS_API_KEY or configure ~/.gitnexus/config.json',
+      });
+      return;
+    }
+
+    if (!llmConfig?.apiKey) {
+      res.status(500).json({ error: 'LLM API key not configured.' });
+      return;
+    }
+
+    // For Chinese questions, append an English translation to help BM25 and
+    // the English-only embedding model match code. One search, dual language.
+    let searchQuery = question;
+    if (hasChinese(question)) {
+      const en = await translateToEnglish(question, llmConfig);
+      if (en) searchQuery = buildSearchQuery(question, en);
+    }
+
     let sources: any[] = [];
     let searchContent = '';
+    let flowsText = '';
     try {
-      const searchResults = await search(question, repoName);
+      const { sources: searchResults, flows: rawFlows = '' } = await search(searchQuery, repoName);
+      flowsText = rawFlows;
       if (searchResults.length > 0) {
         const repoBase = entry ? path.dirname(entry.storagePath) : null;
         const topResults = searchResults.slice(0, 5);
@@ -111,21 +221,6 @@ export function createQaEndpoint(
 
     log('info', 'built sources count=' + sources.length);
 
-    let llmConfig: any;
-    try {
-      llmConfig = await resolveLLMConfig();
-    } catch (e) {
-      res.status(500).json({
-        error: 'Failed to resolve LLM configuration. Set GITNEXUS_API_KEY or configure ~/.gitnexus/config.json',
-      });
-      return;
-    }
-
-    if (!llmConfig?.apiKey) {
-      res.status(500).json({ error: 'LLM API key not configured.' });
-      return;
-    }
-
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -137,21 +232,28 @@ export function createQaEndpoint(
     session.messages.push({ role: 'user', content: question });
     session.updatedAt = new Date();
 
-    const systemPrompt = 'You are Nexus, a Code Analysis Agent with access to a Knowledge Graph. Your responses MUST be grounded.\n\n' +
-      '## MANDATORY: GROUNDING\n' +
-      'Every factual claim MUST include a citation.\n' +
-      '- File refs: [[src/auth.ts:45-60]] (line range with hyphen)\n' +
-      '- NO citation = NO claim. Say "I didn\'t find evidence" instead of guessing.\n\n' +
-      '## CORE PROTOCOL\n' +
-      'For each question: 1. Search  2. Read  3. Cite  4. Validate\n\n' +
-      '## GRAPH SCHEMA\n' +
-      'Nodes: File, Folder, Function, Class, Interface, Method, Community, Process\n' +
-      'Relations: CodeRelation with type: CONTAINS, DEFINES, IMPORTS, CALLS, EXTENDS, IMPLEMENTS, MEMBER_OF, STEP_IN_PROCESS\n\n' +
-      '## OUTPUT STYLE\n' +
-      'Think like a senior architect. Be concise. Use tables for comparisons.\n' +
-      'Use mermaid diagrams for flows. End with **TL;DR**.\n\n' +
+    const qType = classifyQuestion(question);
+    const structure = structureGuide(qType);
+
+    const systemPrompt = 'You are Nexus, a code analyst. Answer the question in DeepWiki style.\n\n' +
+      '## RULES\n' +
+      structure + '\n' +
+      '- Always answer in Chinese.\n' +
+      '- Use mermaid diagrams for architecture flows when relevant.\n' +
+      '- Use code blocks for commands or examples.\n' +
+      '- End with ## Notes (caveats, related context).\n' +
+      '- End with ### Citations:\n' +
+      '  **File:** path (Lstart-end)\n' +
+      '  ```\n' +
+      '  snippet\n' +
+      '  ```\n' +
+      '- Keep paragraphs short (2-4 sentences).\n' +
+      '- Do not restate the question.\n' +
+      '- If unsure, say so.\n\n' +
       '## SEARCH RESULTS\n' +
       (searchContent.slice(0, 5000) || 'No specific search results found for this query.') + '\n\n' +
+      '## EXECUTION FLOWS\n' +
+      (flowsText || 'No process flows found for this query.') + '\n\n' +
       '## WIKI CONTEXT\n' +
       (wikiContext ? wikiContext.slice(0, 3000) : 'No wiki documentation available.');
 
