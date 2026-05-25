@@ -20,10 +20,10 @@
 --color-text-secondary:#8f8f8f;
 --color-blue:#3b82f6;
 --color-purple:#a855f7;
---color-code-bg:#1e293b;
---color-code-text:#e2e8f0;
---color-code-line:#6b7280;
---color-code-border:#374151;
+--color-code-bg:#f6f8fa;
+--color-code-text:#24292e;
+--color-code-line:#6e7681;
+--color-code-border:#d0d7de;
 --color-input-glow:rgba(99,102,241,0.2);
 --color-user-bg:#e8f0fe;
 --assistant-icon:#3b82f6;
@@ -55,7 +55,7 @@
 
 body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg-background);color:var(--color-text-primary);min-height:100vh;display:flex;flex-direction:column}
 
-.container-wrapper{width:100%;max-width:1200px;margin:0 auto;padding:0 16px}
+.container-wrapper{width:100%;max-width:1400px;margin:0 auto;padding:0 16px}
 
 .header{position:sticky;top:0;z-index:30;background:var(--bg-background);border-bottom:1px dashed var(--color-border);flex-shrink:0}
 .header-inner{display:flex;align-items:center;justify-content:space-between;padding:14px 0}
@@ -74,7 +74,7 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-seri
 
 .session-block{padding:28px 0 8px}
 .block-inner{display:flex;gap:28px}
-.block-left{flex:2;min-width:0}
+.block-left{flex:2;min-width:0;background:var(--bg-surface);border:0.5px solid var(--color-border);border-radius:8px;padding:16px}
 .block-right{flex:3;min-width:0}
 
 .block-separator{height:1px;background:var(--color-border)}
@@ -117,8 +117,9 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-seri
 .action-btn svg{width:15px;height:15px}
 
 .file-list-card{background:var(--bg-surface);border:0.5px solid var(--color-border);border-radius:8px;overflow:hidden}
-.file-list-item{display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;font-size:13px;color:var(--color-text-primary);transition:background .1s;user-select:none}
-.file-list-item:hover{background:var(--bg-secondary)}
+.file-list-item{font-size:13px;color:var(--color-text-primary);user-select:none}
+.file-list-item .file-item-header{display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;transition:background .1s}
+.file-list-item .file-item-header:hover{background:var(--bg-secondary)}
 .file-list-item .expand-icon{font-size:8px;color:var(--color-text-secondary);transition:transform .15s;flex-shrink:0;width:12px;text-align:center}
 .file-list-item.expanded .expand-icon{transform:rotate(90deg)}
 .file-item-name{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -150,9 +151,10 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-seri
 .typing-indicator span:nth-child(3){animation-delay:.4s}
 @keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-7px)}}
 
-.bottom-bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:100%;max-width:740px;z-index:20;padding:0 16px}
-.input-box{background:var(--bg-component);border:1px solid var(--color-input-glow);border-radius:10px;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding:8px 12px;display:flex;align-items:flex-end;gap:8px;box-shadow:0 4px 24px rgba(0,0,0,.06)}
-.input-box textarea{flex:1;border:none;background:transparent;outline:none;font-size:14px;font-family:inherit;color:var(--color-text-primary);resize:none;padding:4px 0;line-height:1.5;max-height:90px;min-height:24px}
+.bottom-bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:100%;max-width:600px;z-index:20;padding:0 16px}
+.input-box{background:var(--bg-component);border:1px solid var(--color-border);border-radius:10px;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding:8px 12px;display:flex;align-items:flex-end;gap:8px;box-shadow:0 4px 24px rgba(0,0,0,.06);transition:border-color .15s}
+.input-box:focus-within{border-color:var(--color-blue);box-shadow:0 0 0 3px var(--color-input-glow)}
+.input-box textarea{flex:1;border:none;background:transparent;outline:none;font-size:14px;font-family:inherit;color:var(--color-text-primary);resize:none;padding:8px 0;line-height:1.6;max-height:150px;min-height:48px}
 .input-box textarea::placeholder{color:var(--color-text-secondary)}
 .input-box button{padding:8px 20px;background:var(--color-blue);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;transition:opacity .15s;white-space:nowrap;flex-shrink:0}
 .input-box button:hover{opacity:.88}
@@ -365,7 +367,8 @@ function populateFileList(blockId, sources) {
     const fid = blockId + '-f' + i;
     const sid = blockId + '-s' + i;
     const filteredSnippet = filterSnippetLines(src.snippet, src.startLine, src.endLine);
-    html += '<div class="file-list-item expanded" onclick="toggleFile(\'' + fid + '\')" id="' + fid + '">';
+    html += '<div class="file-list-item expanded" id="' + fid + '">';
+    html += '<div class="file-item-header" onclick="toggleFile(\'' + fid + '\')">';
     html += '<span class="expand-icon">\u25b6</span>';
     html += '<span class="file-item-name">' + escapeHtml(src.fileName) + '</span>';
     html += '<span class="file-item-path">' + escapeHtml(src.filePath) + '</span>';
@@ -373,6 +376,7 @@ function populateFileList(blockId, sources) {
     html += '</div>';
     html += '<div class="file-list-snippet" style="display:block" id="' + sid + '">';
     html += filteredSnippet ? renderSnippet(filteredSnippet) : '<div class="file-list-empty" style="padding:8px 14px">No preview</div>';
+    html += '</div>';
     html += '</div>';
   }
   container.innerHTML = html;
@@ -382,8 +386,8 @@ function toggleFile(itemId) {
   const item = document.getElementById(itemId);
   if (!item) return;
   item.classList.toggle('expanded');
-  const snippet = item.nextElementSibling;
-  if (snippet && snippet.classList.contains('file-list-snippet')) {
+  const snippet = item.querySelector('.file-list-snippet');
+  if (snippet) {
     snippet.style.display = snippet.style.display === 'block' ? 'none' : 'block';
   }
 }
