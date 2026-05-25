@@ -250,6 +250,8 @@ export function createQaEndpoint(
       '- Keep paragraphs short (2-4 sentences).\n' +
       '- Do not restate the question.\n' +
       '- If unsure, say so.\n\n' +
+      '## ABOUT THIS QUERY\n' +
+      'The user asked in Chinese. For search purposes, an English translation was appended to the original question. The SEARCH RESULTS below come from this bilingual query. Base your answer on the actual source code and flows shown in SEARCH RESULTS and EXECUTION FLOWS — not on general knowledge.\n\n' +
       '## SEARCH RESULTS\n' +
       (searchContent.slice(0, 5000) || 'No specific search results found for this query.') + '\n\n' +
       '## EXECUTION FLOWS\n' +
