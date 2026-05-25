@@ -6,6 +6,7 @@
 <title>Code Q&A — GitNexus</title>
 <script src="/vendor/marked.min.js"></script>
 <script src="/vendor/highlight.min.js"></script>
+<script src="/vendor/mermaid.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -105,6 +106,7 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-seri
 .answer-content a{color:var(--color-blue);text-decoration:none}
 .answer-content a:hover{text-decoration:underline}
 .answer-content hr{border:none;border-top:1px solid var(--color-border);margin:16px 0}
+.answer-content .mermaid{margin:16px 0;text-align:center}
 .answer-content pre{background:var(--color-code-bg);color:var(--color-code-text);border-radius:6px;padding:12px 14px;overflow-x:auto;margin:10px 0;font-size:13px;line-height:1.5;position:relative}
 .answer-content pre code{background:none;padding:0;font-size:13px;color:inherit}
 .answer-content code{font-family:'SF Mono',Consolas,'Courier New',monospace;font-size:13px;background:var(--bg-secondary);padding:2px 6px;border-radius:4px;color:inherit}
@@ -418,6 +420,15 @@ function updateAnswerContent(blockId, content) {
   answerEl.querySelectorAll('pre code').forEach((block) => {
     hljs.highlightElement(block);
   });
+  // Convert mermaid code blocks into rendered diagrams
+  answerEl.querySelectorAll('pre code.language-mermaid').forEach(function(block) {
+    var pre = block.parentElement;
+    var div = document.createElement('div');
+    div.className = 'mermaid';
+    div.textContent = block.textContent;
+    pre.parentElement.replaceChild(div, pre);
+  });
+  try { mermaid.run({ querySelector: '.answer-content .mermaid' }); } catch(e) {}
 }
 
 function updateSendBtn() {
@@ -607,6 +618,8 @@ if (savedTheme === 'dark') {
   document.documentElement.classList.add('dark');
   document.getElementById('themeToggle').textContent = '\u2600\uFE0F';
 }
+
+mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose' });
 
 const pathRepoMatch = location.pathname.match(/^\/codewiki\/(?!qa\b)([^/]+)\/qa/);
 let currentRepo = pathRepoMatch?.[1] || new URLSearchParams(location.search).get('repo') || undefined;
