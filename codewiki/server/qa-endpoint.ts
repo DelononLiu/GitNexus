@@ -190,6 +190,7 @@ export function createQaEndpoint(
         for (const r of topResults) {
           lines.push((r.label ?? 'File') + ': ' + (r.name ?? r.filePath?.split('/').pop() ?? '?') +
             ' — ' + r.filePath + (r.startLine ? ':' + r.startLine : ''));
+          const refId = sources.length;
           const sourceEntry: any = {
             filePath: r.filePath,
             label: r.label ?? 'File',
@@ -197,6 +198,7 @@ export function createQaEndpoint(
             endLine: r.endLine,
             fileName: r.filePath?.split('/').pop() ?? '?',
             snippet: '',
+            refId,
           };
           if (repoBase && r.filePath) {
             const srcPath = path.join(repoBase, r.filePath);
@@ -235,6 +237,10 @@ export function createQaEndpoint(
     const qType = classifyQuestion(question);
     const structure = structureGuide(qType);
 
+    const sourceRefs = sources.map((s, i) =>
+      s.fileName + (s.startLine ? ':' + s.startLine + (s.endLine && s.endLine !== s.startLine ? '-' + s.endLine : '') : '')
+    ).join(', ');
+
     const systemPrompt = 'You are Nexus, a code analyst. Answer the question in DeepWiki style.\n\n' +
       '## RULES\n' +
       structure + '\n' +
@@ -244,9 +250,12 @@ export function createQaEndpoint(
       '- End with ## Notes (caveats, related context).\n' +
       '- Keep paragraphs short (2-4 sentences).\n' +
       '- Do not restate the question.\n' +
-      '- If unsure, say so.\n\n' +
+      '- If unsure, say so.\n' +
+      '- When referencing a source file, append the citation at the end of the relevant sentence using " fileName:line" format, e.g. "该函数接收两个参数 cli-commands-table.md:5". If a range, use " fileName:start-end". Use the exact fileName:line shown in SOURCE REFERENCES below. Place the citation right after the sentence content with a space before it, no parentheses or brackets.\n\n' +
       '## ABOUT THIS QUERY\n' +
       'The user asked in Chinese. For search purposes, an English translation was appended to the original question. The SEARCH RESULTS below come from this bilingual query. Base your answer on the actual source code and flows shown in SEARCH RESULTS and EXECUTION FLOWS — not on general knowledge.\n\n' +
+      '## SOURCE REFERENCES\n' +
+      sourceRefs + '\n\n' +
       '## SEARCH RESULTS\n' +
       (searchContent.slice(0, 5000) || 'No specific search results found for this query.') + '\n\n' +
       '## EXECUTION FLOWS\n' +
