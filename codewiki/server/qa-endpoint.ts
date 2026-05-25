@@ -242,11 +242,6 @@ export function createQaEndpoint(
       '- Use mermaid diagrams for architecture flows when relevant.\n' +
       '- Use code blocks for commands or examples.\n' +
       '- End with ## Notes (caveats, related context).\n' +
-      '- End with ### Citations:\n' +
-      '  **File:** path (Lstart-end)\n' +
-      '  ```\n' +
-      '  snippet\n' +
-      '  ```\n' +
       '- Keep paragraphs short (2-4 sentences).\n' +
       '- Do not restate the question.\n' +
       '- If unsure, say so.\n\n' +
