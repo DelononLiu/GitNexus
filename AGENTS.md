@@ -1,5 +1,5 @@
-<!-- version: 1.8.0 -->
-<!-- Last updated: 2026-05-24 -->
+<!-- version: 1.9.0 -->
+<!-- Last updated: 2026-05-26 -->
 
 Last reviewed: 2026-05-24
 
@@ -13,6 +13,7 @@ Last reviewed: 2026-05-24
 | **Writes** | CodeWiki features **MUST** be added inside `codewiki/` first. Only modify `gitnexus/` or `gitnexus-web/` when no existing codewiki interface serves the need (e.g. adding server routes, injecting DOM). Keep diffs minimal. Update lockfiles when deps change. |
 | **Executes** | `npm`, `npx`, `node` under `gitnexus/` and `gitnexus-web/`; `uv run` for Python under `eval/`; documented CI/dev workflows. |
 | **Off-limits** | Real `.env` / secrets, production credentials, unrelated repos, destructive git ops without confirmation. |
+| **Commits** | **Do NOT commit code without explicit user approval.** Only commit when the user says "commit" or "提交". Pushing requires separate confirmation. |
 
 ## Model Configuration
 
@@ -30,7 +31,7 @@ On long threads, *"Remember: apply all AGENTS.md rules"* re-weights these instru
 
 ## Claude Code hooks
 
-**PreToolUse** hooks can block tools (e.g. `git_commit`) until checks pass. Adapt to this repo: `cd gitnexus && npm test` before commit.
+**PreToolUse** hooks can block tools (e.g. `git_commit`) until checks pass. When user approves a commit: `cd gitnexus && npm test` first.
 
 ## Context budget
 
@@ -48,6 +49,7 @@ Commands and gotchas live under **Repo reference** below and in **[CONTRIBUTING.
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-05-26 | 1.9.0 | Added Commits scope boundary: no auto-commits without explicit user approval. |
 | 2026-05-24 | 1.8.0 | Added CodeWiki scope boundary: new features MUST go in `codewiki/` first; only modify `gitnexus/`/`gitnexus-web/` when necessary. |
 | 2026-04-23 | 1.7.0 | TypeScript added to `MIGRATED_LANGUAGES` (registry-primary call resolution by default). |
 | 2026-04-20 | 1.6.0 | Added scope-resolution pipeline pointer (RFC #909 Ring 3); Python migrated to registry-primary. |
@@ -70,7 +72,7 @@ This project is indexed by GitNexus as **GitNexus** (26675 symbols, 35395 relati
 ## Always Do
 
 - **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `gitnexus_impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
-- **MUST run `gitnexus_detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows.
+- **MUST run `gitnexus_detect_changes()` when user requests a commit** to verify changes only affect expected symbols and execution flows.
 - **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
 - When exploring unfamiliar code, use `gitnexus_query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
 - When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `gitnexus_context({name: "symbolName"})`.
@@ -80,7 +82,7 @@ This project is indexed by GitNexus as **GitNexus** (26675 symbols, 35395 relati
 - NEVER edit a function, class, or method without first running `gitnexus_impact` on it.
 - NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
 - NEVER rename symbols with find-and-replace — use `gitnexus_rename` which understands the call graph.
-- NEVER commit changes without running `gitnexus_detect_changes()` to check affected scope.
+- NEVER commit changes without running `gitnexus_detect_changes()` first (only applies when user asked for a commit).
 
 ## Resources
 

@@ -54,11 +54,11 @@
 .dark .hljs{background:transparent!important;color:var(--color-code-text)!important}
 .dark pre code.hljs{color:var(--color-code-text)!important}
 
-body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg-background);color:var(--color-text-primary);min-height:100vh;display:flex;flex-direction:column}
+body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg-background);color:var(--color-text-primary);min-height:100vh}
 
 .container-wrapper{width:100%;max-width:1400px;margin:0 auto;padding:0 16px}
 
-.header{position:sticky;top:0;z-index:30;background:var(--bg-background);border-bottom:1px dashed var(--color-border);flex-shrink:0}
+.header{position:sticky;top:0;z-index:30;background:var(--bg-background);border-bottom:1px dashed var(--color-border)}
 .header-inner{display:flex;align-items:center;justify-content:space-between;padding:14px 0}
 .header-left{display:flex;align-items:center;gap:10px}
 .header-left h1{font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px}
@@ -67,18 +67,17 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-seri
 .btn:hover{background:var(--bg-secondary)}
 .btn-icon{border:none;padding:6px 8px;font-size:16px;line-height:1}
 
-.main{flex:1;overflow-y:auto;padding:0 0 140px}
+.main{margin-right:calc((100vw - 175px) * 0.55 + 95px);padding:0 0 140px 80px}
 .main::-webkit-scrollbar{width:6px}
 .main::-webkit-scrollbar-thumb{background:var(--color-border);border-radius:3px}
 
 #messagesInner{display:flex;flex-direction:column}
 
 .session-block{padding:28px 0 8px}
-.block-inner{display:flex;gap:28px}
-.block-left{flex:2;min-width:0}
-.block-right{flex:3;min-width:0;position:sticky;top:0;align-self:flex-start;max-height:calc(100vh - 190px);overflow-y:auto}
-.block-right::-webkit-scrollbar{width:4px}
-.block-right::-webkit-scrollbar-thumb{background:var(--color-border);border-radius:2px}
+
+.right-panel{position:fixed;top:72px;right:80px;width:calc((100vw - 175px) * 0.55);height:calc(100vh - 72px - 100px);overflow-y:auto;z-index:10}
+.right-panel::-webkit-scrollbar{width:4px}
+.right-panel::-webkit-scrollbar-thumb{background:var(--color-border);border-radius:2px}
 .answer-card{background:var(--bg-surface);border:0.5px solid var(--color-border);border-radius:8px;padding:16px;margin-top:12px}
 
 .block-separator{height:1px;background:var(--color-border)}
@@ -175,8 +174,8 @@ a.file-ref:hover{text-decoration:underline;border-bottom-style:solid}
 .session-block{animation:fadeIn .25s ease-out}
 
 @media(max-width:860px){
-.block-inner{flex-direction:column;gap:16px}
-.block-right{flex:auto;max-height:400px;overflow-y:auto}
+.right-panel{display:none}
+.main{margin-right:0}
 .question-text{font-size:15px}
 }
 </style>
@@ -202,23 +201,28 @@ a.file-ref:hover{text-decoration:underline;border-bottom-style:solid}
 </header>
 
 <main class="main" id="mainScroll">
-  <div class="container-wrapper">
-    <div id="messagesInner">
+  <div id="messagesInner">
 
-      <div class="empty-state" id="emptyState">
-        <h2>Ask about this codebase</h2>
-        <p>I can help you understand architecture, find code, or explain how things work.</p>
-        <div class="suggestions">
-          <button onclick="askSuggestion('Explain the project architecture')">Project architecture</button>
-          <button onclick="askSuggestion('What are the main modules?')">Main modules</button>
-          <button onclick="askSuggestion('How does the data flow work?')">Data flow</button>
-          <button onclick="askSuggestion('Show me key API endpoints')">Key APIs</button>
-        </div>
+    <div class="empty-state" id="emptyState">
+      <h2>Ask about this codebase</h2>
+      <p>I can help you understand architecture, find code, or explain how things work.</p>
+      <div class="suggestions">
+        <button onclick="askSuggestion('Explain the project architecture')">Project architecture</button>
+        <button onclick="askSuggestion('What are the main modules?')">Main modules</button>
+        <button onclick="askSuggestion('How does the data flow work?')">Data flow</button>
+        <button onclick="askSuggestion('Show me key API endpoints')">Key APIs</button>
       </div>
-
     </div>
+
   </div>
 </main>
+
+<div class="right-panel" id="rightPanel">
+  <div class="file-list-card">
+    <div class="file-list-empty" id="fileListEmpty">No files referenced</div>
+    <div id="filesGlobal"></div>
+  </div>
+</div>
 
 <div class="bottom-bar">
   <div class="input-box">
@@ -240,7 +244,7 @@ const emptyState = document.getElementById('emptyState');
 const form = document.getElementById('qaForm');
 const input = document.getElementById('qaInput');
 const sendBtn = document.getElementById('sendBtn');
-const mainScroll = document.getElementById('mainScroll');
+const mainScroll = document.getElementById('messagesInner');
 
 function logDebug(label, detail) {
   const el = document.getElementById('qaDebug');
@@ -292,29 +296,20 @@ function createSessionBlock(question) {
   block.className = 'session-block';
   block.id = blockId;
   block.innerHTML = `
-    <div class="block-inner">
-      <div class="block-left">
-        <div class="breadcrumb"><a href="/codewiki/${encodeURIComponent(currentRepo || '')}">\u2190 Overview</a></div>
-        <div class="question-title">
-          <span class="question-text">${escapeHtml(question)}</span>
-          <span class="fast-badge">Fast</span>
-        </div>
-        <div class="answer-card">
-          <div class="answer-content" id="answer-${blockId}"></div>
-          <div class="answer-actions">
-            <button class="action-btn" onclick="copyAnswer('${blockId}')" title="Copy answer">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            </button>
-            <button class="action-btn" onclick="shareBlock('${blockId}')" title="Share this Q&A">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-      <div class="block-right">
-        <div class="file-list-card" id="files-${blockId}">
-          <div class="file-list-empty">Processing sources\u2026</div>
-        </div>
+    <div class="breadcrumb"><a href="/codewiki/${encodeURIComponent(currentRepo || '')}">\u2190 Overview</a></div>
+    <div class="question-title">
+      <span class="question-text">${escapeHtml(question)}</span>
+      <span class="fast-badge">Fast</span>
+    </div>
+    <div class="answer-card">
+      <div class="answer-content" id="answer-${blockId}"></div>
+      <div class="answer-actions">
+        <button class="action-btn" onclick="copyAnswer('${blockId}')" title="Copy answer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+        <button class="action-btn" onclick="shareBlock('${blockId}')" title="Share this Q&A">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+        </button>
       </div>
     </div>
   `;
@@ -358,13 +353,16 @@ function renderSnippet(snippet, maxLines) {
 function populateFileList(blockId, sources) {
   _sourceMap[blockId] = sources;
 
-  const container = document.getElementById('files-' + blockId);
+  const container = document.getElementById('filesGlobal');
+  const empty = document.getElementById('fileListEmpty');
   if (!container) return;
 
   if (!sources || sources.length === 0) {
-    container.innerHTML = '<div class="file-list-empty">No files referenced</div>';
+    container.innerHTML = '';
+    if (empty) empty.style.display = '';
     return;
   }
+  if (empty) empty.style.display = 'none';
 
   // Filter snippet to only show lines within startLine-endLine range
   function filterSnippetLines(snippet, startLine, endLine) {
@@ -434,24 +432,17 @@ function setTyping(typing) {
 }
 
 function navigateToSource(blockId, refId) {
-  const container = document.getElementById('files-' + blockId);
-  if (!container) return false;
-
-  const fileItem = container.querySelector('.file-list-item[data-source-id="' + refId + '"]');
+  const panel = document.getElementById('rightPanel');
+  const fileItem = document.getElementById('filesGlobal').querySelector('.file-list-item[data-source-id="' + refId + '"]');
   if (!fileItem) return false;
 
-  const snippet = fileItem.querySelector('.file-list-snippet');
-  if (snippet && snippet.style.display !== 'block') {
-    fileItem.classList.add('expanded');
-    snippet.style.display = 'block';
-  }
-
-  document.querySelectorAll('.file-list-item.source-highlight').forEach(function(el) {
-    el.classList.remove('source-highlight');
-  });
   fileItem.classList.add('source-highlight');
-
-  fileItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const snippet = fileItem.querySelector('.file-list-snippet');
+  if (snippet) snippet.style.display = 'block';
+  fileItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  setTimeout(function() {
+    fileItem.classList.remove('source-highlight');
+  }, 3000);
   return false;
 }
 
