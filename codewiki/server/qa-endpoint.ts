@@ -105,6 +105,83 @@ async function acpPrompt(
   return { content, sessionId };
 }
 
+const FILE_REF_RE = /([\w./-]+(?:\.[a-zA-Z][\w.-]*)):(\d+)(?:-(\d+))?/g;
+
+function extractFileRefs(text: string): { fileName: string; startLine: number; endLine: number }[] {
+  const refs: { fileName: string; startLine: number; endLine: number }[] = [];
+  const seen = new Set<string>();
+  let m: RegExpExecArray | null;
+  FILE_REF_RE.lastIndex = 0;
+  while ((m = FILE_REF_RE.exec(text)) !== null) {
+    const fileName = m[1].split('/').pop() || m[1];
+    const startLine = parseInt(m[2], 10);
+    const endLine = m[3] ? parseInt(m[3], 10) : startLine;
+    const key = fileName + ':' + startLine;
+    if (!seen.has(key)) {
+      seen.add(key);
+      refs.push({ fileName, startLine, endLine });
+    }
+  }
+  return refs;
+}
+
+async function resolveAnswerSources(
+  content: string,
+  existingSources: any[],
+  repoBase: string | null,
+): Promise<any[]> {
+  const refs = extractFileRefs(content);
+  if (!repoBase || refs.length === 0) return existingSources;
+
+  const merged = [...existingSources];
+  const existingKeys = new Set<string>();
+  for (const s of existingSources) {
+    const k = s.fileName + ':' + (s.startLine ?? '');
+    existingKeys.add(k);
+  }
+
+  let refId = existingSources.length;
+  for (const ref of refs) {
+    const key = ref.fileName + ':' + ref.startLine;
+    if (existingKeys.has(key)) continue;
+
+    const candidatePaths = [
+      path.join(repoBase, ref.fileName),
+      path.join(repoBase, 'src', ref.fileName),
+      path.join(repoBase, 'lib', ref.fileName),
+    ];
+    let snippet = '';
+    let filePath = '';
+    for (const cp of candidatePaths) {
+      try {
+        const stat = await fs.stat(cp);
+        if (stat.isFile()) {
+          filePath = cp;
+          const srcContent = await fs.readFile(cp, 'utf-8');
+          const srcLines = srcContent.split('\n');
+          const start = Math.max(0, ref.startLine - 2);
+          const end = Math.min(srcLines.length, ref.endLine + 2);
+          snippet = srcLines.slice(start, end).map((l, i) => (start + i + 1) + ': ' + l).join('\n');
+          break;
+        }
+      } catch {}
+    }
+    if (!snippet) continue;
+
+    existingKeys.add(key);
+    merged.push({
+      filePath: filePath ? path.relative(repoBase, filePath) : ref.fileName,
+      label: 'File',
+      startLine: ref.startLine,
+      endLine: ref.endLine,
+      fileName: ref.fileName,
+      snippet,
+      refId: refId++,
+    });
+  }
+  return merged;
+}
+
 type QuestionType = 'overview' | 'feature' | 'debug' | 'compare' | 'api' | 'general';
 
 function classifyQuestion(question: string): QuestionType {
@@ -350,6 +427,11 @@ export function createQaEndpoint(
           if (content && !aborted) {
             session.messages.push({ role: 'assistant', content });
             session.updatedAt = new Date();
+            const repoBase = entry ? path.dirname(entry.storagePath) : null;
+            const resolvedSources = await resolveAnswerSources(content, sources, repoBase);
+            if (resolvedSources.length > sources.length) {
+              res.write('data: ' + JSON.stringify({ type: 'sources', sources: resolvedSources }) + '\n\n');
+            }
           }
           res.write('data: ' + JSON.stringify({ type: 'done' }) + '\n\n');
           res.end();
@@ -447,6 +529,11 @@ export function createQaEndpoint(
       if (assistantContent) {
         session.messages.push({ role: 'assistant', content: assistantContent });
         session.updatedAt = new Date();
+        const repoBase = entry ? path.dirname(entry.storagePath) : null;
+        const resolvedSources = await resolveAnswerSources(assistantContent, sources, repoBase);
+        if (resolvedSources.length > sources.length) {
+          res.write('data: ' + JSON.stringify({ type: 'sources', sources: resolvedSources }) + '\n\n');
+        }
       }
       res.write('data: ' + JSON.stringify({ type: 'done' }) + '\n\n');
       res.end();
