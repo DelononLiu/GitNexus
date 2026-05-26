@@ -137,10 +137,9 @@ a.file-ref:hover{text-decoration:underline;border-bottom-style:solid}
 .file-list-snippet{display:none;background:var(--color-code-bg);border-top:0.5px solid var(--color-code-border)}
 .file-list-empty{padding:14px;font-size:13px;color:var(--color-text-secondary);text-align:center}
 
-.file-list-snippet .code-snippet{border-radius:0;max-height:260px}
-.code-snippet{background:var(--color-code-bg);overflow:hidden;font-family:'SF Mono',Consolas,'Courier New',monospace;font-size:12px;line-height:1.55;max-height:260px;overflow-y:auto}
-.code-snippet::-webkit-scrollbar{width:4px}
-.code-snippet::-webkit-scrollbar-thumb{background:var(--color-code-border);border-radius:2px}
+.code-snippet{background:var(--color-code-bg);font-family:'SF Mono',Consolas,'Courier New',monospace;font-size:12px;line-height:1.55}
+.code-expand-btn{padding:6px 14px;font-size:12px;color:var(--color-blue);cursor:pointer;border-top:0.5px solid var(--color-code-border);text-align:center;user-select:none}
+.code-expand-btn:hover{background:rgba(59,130,246,.05)}
 .code-line{display:flex;min-height:20px}
 .code-line:hover{background:rgba(255,255,255,.03)}
 .line-num{width:44px;text-align:right;padding:0 10px;color:var(--color-code-line);user-select:none;border-right:1px solid var(--color-code-border);flex-shrink:0;font-size:11px}
@@ -324,17 +323,33 @@ function createSessionBlock(question) {
   return blockId;
 }
 
-function renderSnippet(snippet) {
+function renderSnippet(snippet, maxLines) {
   if (!snippet) return '';
-  const lines = snippet.split('\n');
-  let html = '<div class="code-snippet">';
-  for (const line of lines) {
-    const match = line.match(/^(\d+):\s?(.*)$/);
-    if (match) {
-      html += '<div class="code-line"><span class="line-num">' + match[1] + '</span><span class="line-content">' + escapeHtml(match[2]) + '</span></div>';
-    } else {
-      html += '<div class="code-line"><span class="line-num"></span><span class="line-content">' + escapeHtml(line) + '</span></div>';
+  maxLines = maxLines || 10;
+  const allLines = snippet.split('\n');
+  const showAll = allLines.length <= maxLines;
+  const visibleLines = showAll ? allLines : allLines.slice(0, maxLines);
+
+  function fmtLine(line) {
+    const m = line.match(/^(\d+):\s?(.*)$/);
+    if (m) {
+      return '<div class="code-line"><span class="line-num">' + m[1] + '</span><span class="line-content">' + escapeHtml(m[2]) + '</span></div>';
     }
+    return '<div class="code-line"><span class="line-num"></span><span class="line-content">' + escapeHtml(line) + '</span></div>';
+  }
+
+  let html = '<div class="code-snippet">';
+  for (const line of visibleLines) {
+    html += fmtLine(line);
+  }
+  if (!showAll) {
+    const extraId = 'extra-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+    html += '<div id="' + extraId + '" style="display:none">';
+    for (let i = maxLines; i < allLines.length; i++) {
+      html += fmtLine(allLines[i]);
+    }
+    html += '</div>';
+    html += '<div class="code-expand-btn" onclick="(function(){var e=document.getElementById(\'' + extraId + '\');var t=this;if(e.style.display===\'none\'){e.style.display=\'\';t.textContent=\'Show less \u25b2\';}else{e.style.display=\'none\';t.textContent=\'Show more \u25bc\';}})()">Show more \u25bc</div>';
   }
   html += '</div>';
   return html;
