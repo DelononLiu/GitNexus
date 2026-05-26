@@ -1,5 +1,8 @@
 import fs from 'fs/promises';
 import path from 'path';
+import type { ServerResponse } from 'http';
+import { AcpClient } from './acp/AcpClient.js';
+import type { AcpMessageHandler } from './acp/types.js';
 
 interface QaMessage { role: string; content: string }
 interface QaSession {
@@ -26,6 +29,80 @@ function log(level: 'info' | 'warn' | 'error' | 'debug', msg: string, data?: Rec
   const ts = new Date().toISOString();
   const line = data ? msg + ' ' + JSON.stringify(data) : msg;
   console.error('[' + ts + '] [qa] [' + level + '] ' + line);
+}
+
+const ACP_ENABLED = process.env.CODEWIKI_ACP_ENABLE === 'true';
+
+let acpClient: AcpClient | null = null;
+let acpInitialized = false;
+
+async function ensureAcpClient(cwd: string): Promise<AcpClient | null> {
+  if (acpInitialized) return acpClient;
+  acpInitialized = true;
+  acpClient = new AcpClient(cwd);
+  const ok = await acpClient.connect();
+  if (!ok) {
+    log('error', 'ACP init failed', { error: acpClient.lastError });
+    acpClient = null;
+  }
+  return acpClient;
+}
+
+function buildPrompt(
+  question: string,
+  systemPrompt: string,
+  history: { role: string; content: string }[],
+): string {
+  const parts: string[] = [];
+  parts.push('<system>\n' + systemPrompt + '\n</system>');
+  for (const h of history) {
+    const tag = h.role === 'user' ? 'user' : 'assistant';
+    parts.push('<' + tag + '>\n' + h.content + '\n</' + tag + '>');
+  }
+  parts.push('<user>\n' + question + '\n</user>');
+  return parts.join('\n\n');
+}
+
+async function acpPrompt(
+  client: AcpClient,
+  question: string,
+  systemPrompt: string,
+  history: { role: string; content: string }[],
+  res: ServerResponse,
+): Promise<{ content: string; sessionId: string }> {
+  const sessionId = await client.ensureSession();
+  if (!sessionId) {
+    throw new Error('ACP session creation failed');
+  }
+
+  const prompt = buildPrompt(question, systemPrompt, history);
+  let content = '';
+
+  const handler: AcpMessageHandler = {
+    onText: (text: string) => {
+      content += text;
+      res.write('data: ' + JSON.stringify({ type: 'token', content: text }) + '\n\n');
+    },
+    onReasoning: (text: string) => {
+      res.write('data: ' + JSON.stringify({ type: 'reasoning', content: text }) + '\n\n');
+    },
+    onToolCall: (toolCallId, title, kind, status) => {
+      log('info', 'ACP tool_call', { toolCallId, title, kind, status });
+    },
+    onToolCallUpdate: (toolCallId, status, content, title, kind) => {
+      if (content) {
+        log('info', 'ACP tool result', { toolCallId, status, len: content.length });
+      }
+    },
+    onPlan: (entries) => {},
+    onError: (error: string) => {
+      res.write('data: ' + JSON.stringify({ type: 'error', message: error }) + '\n\n');
+    },
+    onDone: () => {},
+  };
+
+  await client.sendPrompt(prompt, handler);
+  return { content, sessionId };
 }
 
 type QuestionType = 'overview' | 'feature' | 'debug' | 'compare' | 'api' | 'general';
@@ -154,25 +231,23 @@ export function createQaEndpoint(
       } catch {}
     }
 
-    let llmConfig: any;
+    let llmConfig: any = undefined;
     try {
       llmConfig = await resolveLLMConfig();
-    } catch (e) {
+    } catch {}
+    const hasLLM = !!llmConfig?.apiKey;
+
+    if (!ACP_ENABLED && !hasLLM) {
       res.status(500).json({
         error: 'Failed to resolve LLM configuration. Set GITNEXUS_API_KEY or configure ~/.gitnexus/config.json',
       });
       return;
     }
 
-    if (!llmConfig?.apiKey) {
-      res.status(500).json({ error: 'LLM API key not configured.' });
-      return;
-    }
-
     // For Chinese questions, append an English translation to help BM25 and
     // the English-only embedding model match code. One search, dual language.
     let searchQuery = question;
-    if (hasChinese(question)) {
+    if (hasChinese(question) && hasLLM) {
       const en = await translateToEnglish(question, llmConfig);
       if (en) searchQuery = buildSearchQuery(question, en);
     }
@@ -262,6 +337,39 @@ export function createQaEndpoint(
       (flowsText || 'No process flows found for this query.') + '\n\n' +
       '## WIKI CONTEXT\n' +
       (wikiContext ? wikiContext.slice(0, 3000) : 'No wiki documentation available.');
+
+    if (ACP_ENABLED) {
+      const repoRoot = entry ? path.dirname(entry.storagePath) : process.cwd();
+      const client = await ensureAcpClient(repoRoot);
+      if (client) {
+        let aborted = false;
+        req.on('close', () => { aborted = true; client.cancel(); });
+
+        try {
+          const { content } = await acpPrompt(client, question, systemPrompt, history, res);
+          if (content && !aborted) {
+            session.messages.push({ role: 'assistant', content });
+            session.updatedAt = new Date();
+          }
+          res.write('data: ' + JSON.stringify({ type: 'done' }) + '\n\n');
+          res.end();
+        } catch (err: any) {
+          if (!aborted) {
+            log('error', 'ACP prompt failed', { error: err.message });
+            res.write('data: ' + JSON.stringify({ type: 'error', message: err.message ?? 'ACP request failed' }) + '\n\n');
+            res.end();
+          }
+        }
+        return;
+      }
+      log('warn', 'ACP not available, falling back to LLM', { hasLLM });
+    }
+
+    if (!hasLLM) {
+      res.write('data: ' + JSON.stringify({ type: 'error', message: 'No LLM or ACP backend available' }) + '\n\n');
+      res.end();
+      return;
+    }
 
     const messages = [
       { role: 'system', content: systemPrompt },
