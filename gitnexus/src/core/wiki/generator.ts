@@ -203,6 +203,24 @@ export class WikiGenerator {
   }
 
   /**
+   * Build a grouping system prompt with language instruction for non-English output.
+   * Unlike buildSystemPrompt, this only adds the instruction when the target language
+   * uses a non-Latin script (Chinese, Japanese, etc.) to avoid breaking slug stability
+   * with accented Latin characters.
+   */
+  private buildGroupingSystemPrompt(): string {
+    const lang = this.effectiveLang();
+    if (!lang || /^en(?:glish)?$/i.test(lang)) return GROUPING_SYSTEM_PROMPT;
+    const lc = lang.toLowerCase();
+    if (lc === 'chinese' || lc.startsWith('zh') || lc === 'japanese' || lc.startsWith('ja') || lc.startsWith('ko')) {
+      return `${GROUPING_SYSTEM_PROMPT}\n\nIMPORTANT: Module names (JSON keys in the output) MUST be in ${lang}. Do NOT translate file paths — only the group/label names.`;
+    }
+    // For Latin-script languages (Spanish, French, etc.), keep English module names
+    // to avoid slug stability issues with accents.
+    return GROUPING_SYSTEM_PROMPT;
+  }
+
+  /**
    * Route LLM call to the appropriate provider (OpenAI-compatible or Cursor CLI).
    */
   private async invokeLLM(
@@ -246,11 +264,13 @@ export class WikiGenerator {
       return { pagesGenerated: 0, mode: 'up-to-date', failedModules: [] };
     }
 
-    // Force mode: delete snapshot to force full re-grouping
+    // Force mode: delete snapshots to force full re-grouping
     if (forceMode) {
-      try {
-        await fs.unlink(path.join(this.wikiDir, 'first_module_tree.json'));
-      } catch {}
+      for (const name of ['first_module_tree.json', 'module_tree.json']) {
+        try {
+          await fs.unlink(path.join(this.wikiDir, name));
+        } catch {}
+      }
       // Delete existing module pages so they get regenerated
       const existingFiles = await fs.readdir(this.wikiDir).catch(() => [] as string[]);
       for (const f of existingFiles) {
@@ -302,7 +322,7 @@ export class WikiGenerator {
 
     this.onProgress('html', 98, 'Building HTML viewer...');
     const repoName = path.basename(this.repoPath);
-    await generateHTMLViewer(this.wikiDir, repoName);
+    await generateHTMLViewer(this.wikiDir, repoName, this.effectiveLang());
   }
 
   // ─── Full Generation ────────────────────────────────────────────────
@@ -459,12 +479,12 @@ export class WikiGenerator {
       DIRECTORY_TREE: dirTree,
     });
 
-    // Grouping is a structured-data phase (JSON output), not documentation.
-    // Do NOT apply buildSystemPrompt here — a language instruction would risk
-    // translating module-name keys, breaking slug stability and JSON parsing.
+    // For non-English languages, also apply language instruction to module naming.
+    // slugify() preserves CJK characters so module names can be non-ASCII.
+    const groupingSystemPrompt = this.buildGroupingSystemPrompt();
     const response = await this.invokeLLM(
       prompt,
-      GROUPING_SYSTEM_PROMPT,
+      groupingSystemPrompt,
       this.streamOpts('Grouping files', 15, 13),
     );
     const grouping = this.parseGroupingResponse(response.content, files);
@@ -1125,10 +1145,12 @@ export class WikiGenerator {
 
   private slugify(name: string): string {
     return name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/[\s_]+/g, '-')
+      .replace(/[^a-z0-9\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff-]+/gi, '')
+      .replace(/-+/g, '-')
       .replace(/^-+|-+$/g, '')
-      .slice(0, 60);
+      .slice(0, 60)
+      .toLowerCase();
   }
 
   private async fileExists(fp: string): Promise<boolean> {

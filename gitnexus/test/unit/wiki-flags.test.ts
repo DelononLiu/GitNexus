@@ -1101,7 +1101,7 @@ describe('WikiGenerator grouping prompt isolation', () => {
     await fs.rm(tmpDir, { recursive: true, force: true });
   });
 
-  it('grouping LLM call receives raw GROUPING_SYSTEM_PROMPT even when --lang is set', async () => {
+  it('grouping LLM call receives language-extended GROUPING_SYSTEM_PROMPT when --lang is chinese', async () => {
     vi.doMock('../../src/core/wiki/graph-queries.js', () => ({
       initWikiDb: vi.fn().mockResolvedValue(undefined),
       closeWikiDb: vi.fn().mockResolvedValue(undefined),
@@ -1156,8 +1156,8 @@ describe('WikiGenerator grouping prompt isolation', () => {
     // reviewOnly stops after grouping exactly one LLM call
     expect(callLLMSpy).toHaveBeenCalledTimes(1);
     // callLLM(prompt, llmConfig, systemPrompt, options) system prompt is arg[2]
-    const groupingSystemPrompt = callLLMSpy.mock.calls[0][2];
-    expect(groupingSystemPrompt).toBe(GROUPING_SYSTEM_PROMPT);
-    expect(groupingSystemPrompt).not.toContain('chinese');
+    const groupingSystemPrompt = callLLMSpy.mock.calls[0][2] as string;
+    expect(groupingSystemPrompt).toContain('Module names (JSON keys in the output) MUST be in chinese');
+    expect(groupingSystemPrompt).toContain(GROUPING_SYSTEM_PROMPT);
   });
 });
