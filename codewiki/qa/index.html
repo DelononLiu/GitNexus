@@ -594,11 +594,13 @@ async function sendMessage(e) {
             logDebug('sources event', 'count=' + (data.sources?.length ?? 0) + ' blockId=' + currentBlockId);
             if (currentBlockId) {
               populateFileList(currentBlockId, data.sources);
+              processFileRefs(document.getElementById('answer-' + currentBlockId), currentBlockId);
             } else {
               setTimeout(() => {
                 const lastBlock = messagesInner.querySelector('.session-block:last-child');
                 if (lastBlock) {
                   populateFileList(lastBlock.id, data.sources);
+                  processFileRefs(document.getElementById('answer-' + lastBlock.id), lastBlock.id);
                 }
               }, 100);
             }
