@@ -12,6 +12,7 @@ interface QaSession {
   messages: QaMessage[];
   sources: any[];
   repo?: string;
+  acpSessionId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -19,6 +20,9 @@ interface QaSession {
 const sessions = new Map<string, QaSession>();
 
 const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const MAX_SESSIONS_PER_REPO = 20;
+const SESSION_TTL_MS = 30 * 60 * 1000;
+const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 
 function getDataDir(): string {
   return process.env.GITNEXUS_QA_DATA_DIR || path.join(os.homedir(), '.gitnexus', 'qa-sessions');
@@ -33,7 +37,7 @@ function generateSessionId(): string {
 }
 
 function sessionToJson(s: QaSession): Record<string, unknown> {
-  return { id: s.id, repo: s.repo, messages: s.messages, sources: s.sources, createdAt: s.createdAt, updatedAt: s.updatedAt };
+  return { id: s.id, repo: s.repo, messages: s.messages, sources: s.sources, acpSessionId: s.acpSessionId, createdAt: s.createdAt, updatedAt: s.updatedAt };
 }
 
 function sessionFromJson(data: Record<string, unknown>): QaSession {
@@ -42,6 +46,7 @@ function sessionFromJson(data: Record<string, unknown>): QaSession {
     repo: data.repo as string | undefined,
     messages: (data.messages || []) as QaMessage[],
     sources: (data.sources || []) as any[],
+    acpSessionId: data.acpSessionId as string | undefined,
     createdAt: data.createdAt as string,
     updatedAt: data.updatedAt as string,
   };
@@ -88,11 +93,13 @@ async function cleanupStaleSessions(): Promise<void> {
   const dir = getDataDir();
   for (const [id, session] of sessions) {
     const age = now - new Date(session.updatedAt).getTime();
-    if (age > SESSION_MAX_AGE_MS) {
+    if (age > SESSION_TTL_MS) {
+      closeAcpSession(session);
       sessions.delete(id);
       try { await fs.unlink(sessionFilePath(id)); } catch {}
     }
   }
+  // Remove orphaned disk files
   try {
     const files = await fs.readdir(dir);
     for (const f of files) {
@@ -105,7 +112,21 @@ async function cleanupStaleSessions(): Promise<void> {
   } catch {}
 }
 
+function closeAcpSession(session: QaSession): void {
+  const repoName = session.repo;
+  const acpSessionId = session.acpSessionId;
+  if (!repoName || !acpSessionId) return;
+  const client = repoClients.get(repoName);
+  if (client) {
+    client.closeSession(acpSessionId);
+    const active = repoActiveSessions.get(repoName);
+    if (active) active.delete(acpSessionId);
+  }
+  session.acpSessionId = undefined;
+}
+
 loadSessions();
+setInterval(cleanupStaleSessions, CLEANUP_INTERVAL_MS);
 
 export function getSession(id: string): QaSession | undefined {
   return sessions.get(id);
@@ -119,19 +140,23 @@ function log(level: 'info' | 'warn' | 'error' | 'debug', msg: string, data?: Rec
 
 const ACP_ENABLED = process.env.CODEWIKI_ACP_ENABLE === 'true';
 
-let acpClient: AcpClient | null = null;
-let acpInitialized = false;
+const repoClients = new Map<string, AcpClient>();
+const repoActiveSessions = new Map<string, Set<string>>();
 
-async function ensureAcpClient(cwd: string): Promise<AcpClient | null> {
-  if (acpInitialized) return acpClient;
-  acpInitialized = true;
-  acpClient = new AcpClient(cwd);
-  const ok = await acpClient.connect();
+async function initRepoClient(repoName: string, repoBase: string): Promise<AcpClient | null> {
+  const existing = repoClients.get(repoName);
+  if (existing?.connected) return existing;
+
+  const client = new AcpClient(repoBase);
+  const ok = await client.connect();
   if (!ok) {
-    log('error', 'ACP init failed', { error: acpClient.lastError });
-    acpClient = null;
+    log('error', 'ACP init failed', { repo: repoName, error: client.lastError });
+    return null;
   }
-  return acpClient;
+  repoClients.set(repoName, client);
+  repoActiveSessions.set(repoName, new Set());
+  log('info', 'ACP repo client ready', { repo: repoName });
+  return client;
 }
 
 function buildPrompt(
@@ -149,16 +174,12 @@ function buildPrompt(
 
 async function acpPrompt(
   client: AcpClient,
+  acpSessionId: string,
   question: string,
   systemPrompt: string,
   isFirstTurn: boolean,
   res: ServerResponse,
-): Promise<{ content: string; sessionId: string }> {
-  const sessionId = await client.ensureSession();
-  if (!sessionId) {
-    throw new Error('ACP session creation failed');
-  }
-
+): Promise<string> {
   const prompt = buildPrompt(question, systemPrompt, isFirstTurn);
   let content = '';
 
@@ -185,8 +206,8 @@ async function acpPrompt(
     onDone: () => {},
   };
 
-  await client.sendPrompt(prompt, handler);
-  return { content, sessionId };
+  await client.sendPrompt(acpSessionId, prompt, handler);
+  return content;
 }
 
 const FILE_REF_RE = /([\w./-]+(?:\.[a-zA-Z][\w.-]*)):(\d+)(?:-(\d+))?/g;
@@ -393,7 +414,22 @@ export function createQaEndpoint(
     provider?: string;
   }>,
   search: (query: string, repo?: string) => Promise<{ sources: any[]; flows?: string }>,
+  listRepos?: () => Promise<{ name: string }[]>,
 ) {
+  // Eager init: pre-start ACP clients for all indexed repos
+  if (ACP_ENABLED && listRepos) {
+    listRepos().then(repos => {
+      for (const repo of repos) {
+        resolveRepo(repo.name).then(entry => {
+          if (entry) {
+            const repoBase = path.dirname(entry.storagePath);
+            initRepoClient(repo.name, repoBase);
+          }
+        });
+      }
+    });
+  }
+
   return async (req: any, res: any) => {
     const question = req.body?.question?.trim();
     const history: { role: string; content: string }[] = req.body?.history ?? [];
@@ -531,38 +567,66 @@ export function createQaEndpoint(
       '> 引用不要用反引号包裹！错误示例：\`(file.ts:1)\`。正确：(file.ts:1)。\n\n';
 
     if (ACP_ENABLED) {
-      const repoRoot = entry ? path.dirname(entry.storagePath) : process.cwd();
-      const client = await ensureAcpClient(repoRoot);
-      if (client) {
-        let aborted = false;
-        req.on('close', () => { aborted = true; client.cancel(); });
+      const repoName = entry?.name;
+      let acpSessionId = session.acpSessionId;
 
-        try {
-          const isFirstTurn = session.messages.length <= 1;
-          const { content } = await acpPrompt(client, question, systemPrompt, isFirstTurn, res);
-          if (content && !aborted) {
-            session.messages.push({ role: 'assistant', content });
-            session.updatedAt = new Date().toISOString();
-            const repoBase = entry ? path.dirname(entry.storagePath) : null;
-            log('debug', 'ACP content sample', { len: content.length, sample: content.replace(/[\r\n]/g, ' ').slice(0, 500) });
-            const resolvedSources = await resolveAnswerSources(content, sources, repoBase);
-            const finalSources = resolvedSources.length > sources.length ? resolvedSources : sources;
-            session.sources = finalSources;
-            saveSession(session);
-            if (resolvedSources.length > sources.length) {
-              res.write('data: ' + JSON.stringify({ type: 'sources', sources: resolvedSources }) + '\n\n');
+      if (repoName) {
+        let client = repoClients.get(repoName);
+        if (!client) {
+          const repoBase = path.dirname(entry!.storagePath);
+          client = await initRepoClient(repoName, repoBase);
+        }
+
+        if (client) {
+          // Max session check
+          const activeSessions = repoActiveSessions.get(repoName);
+          if (activeSessions && activeSessions.size >= MAX_SESSIONS_PER_REPO) {
+            res.write('data: ' + JSON.stringify({ type: 'error', message: 'Too many active sessions, please try again later' }) + '\n\n');
+            res.end();
+            return;
+          }
+
+          // Create ACP session if this QA session doesn't have one yet
+          if (!acpSessionId) {
+            acpSessionId = await client.createSession();
+            if (acpSessionId) {
+              session.acpSessionId = acpSessionId;
+              activeSessions?.add(acpSessionId);
+              saveSession(session);
             }
           }
-          res.write('data: ' + JSON.stringify({ type: 'done' }) + '\n\n');
-          res.end();
-        } catch (err: any) {
-          if (!aborted) {
-            log('error', 'ACP prompt failed', { error: err.message });
-            res.write('data: ' + JSON.stringify({ type: 'error', message: err.message ?? 'ACP request failed' }) + '\n\n');
-            res.end();
+
+          if (acpSessionId) {
+            let aborted = false;
+            req.on('close', () => { aborted = true; client.cancel(acpSessionId!); });
+
+            try {
+              const isFirstTurn = session.messages.length <= 1;
+              const content = await acpPrompt(client, acpSessionId, question, systemPrompt, isFirstTurn, res);
+              if (content && !aborted) {
+                session.messages.push({ role: 'assistant', content });
+                session.updatedAt = new Date().toISOString();
+                const repoBase = entry ? path.dirname(entry.storagePath) : null;
+                const resolvedSources = await resolveAnswerSources(content, sources, repoBase);
+                const finalSources = resolvedSources.length > sources.length ? resolvedSources : sources;
+                session.sources = finalSources;
+                saveSession(session);
+                if (resolvedSources.length > sources.length) {
+                  res.write('data: ' + JSON.stringify({ type: 'sources', sources: resolvedSources }) + '\n\n');
+                }
+              }
+              res.write('data: ' + JSON.stringify({ type: 'done' }) + '\n\n');
+              res.end();
+            } catch (err: any) {
+              if (!aborted) {
+                log('error', 'ACP prompt failed', { error: err.message });
+                res.write('data: ' + JSON.stringify({ type: 'error', message: err.message ?? 'ACP request failed' }) + '\n\n');
+                res.end();
+              }
+            }
+            return;
           }
         }
-        return;
       }
       log('warn', 'ACP not available, falling back to LLM', { hasLLM });
     }
@@ -651,7 +715,6 @@ export function createQaEndpoint(
         session.updatedAt = new Date().toISOString();
         const repoBase = entry ? path.dirname(entry.storagePath) : null;
         const resolvedSources = await resolveAnswerSources(assistantContent, sources, repoBase);
-        log('debug', 'resolveAnswerSources done', { sourcesLen: sources.length, resolvedLen: resolvedSources.length, repoBase: repoBase ?? '(null)' });
         const finalSources = resolvedSources.length > sources.length ? resolvedSources : sources;
         session.sources = finalSources;
         saveSession(session);

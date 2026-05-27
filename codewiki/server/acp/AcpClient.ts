@@ -13,7 +13,6 @@ export class AcpClient {
   private connection: acp.ClientSideConnection | null = null;
   private agentManager: AgentManager;
   private client: CodeWikiACPClient | null = null;
-  private sessionId: string | null = null;
   private _connected = false;
   private _lastError = '';
   private _cwd = '';
@@ -69,31 +68,18 @@ export class AcpClient {
     }
   }
 
-  async ensureSession(cwd?: string): Promise<string | null> {
+  async createSession(): Promise<string | null> {
     if (!this.connection) {
       this._lastError = 'ACP not connected';
       return null;
     }
 
-    if (this.sessionId) {
-      try {
-        await this.connection.resumeSession({
-          sessionId: this.sessionId,
-          cwd: cwd ?? this._cwd,
-        });
-        return this.sessionId;
-      } catch {
-        log('warn', 'resumeSession failed, creating new session');
-      }
-    }
-
     try {
       const result = await this.connection.newSession({
-        cwd: cwd ?? this._cwd,
+        cwd: this._cwd,
         mcpServers: [],
       });
-      this.sessionId = result.sessionId;
-      return this.sessionId;
+      return result.sessionId;
     } catch (err) {
       this._lastError = `createSession failed: ${(err as Error)?.message || String(err)}`;
       log('error', this._lastError);
@@ -101,58 +87,45 @@ export class AcpClient {
     }
   }
 
-  private _busy = false;
-
-  async sendPrompt(text: string, handler: AcpMessageHandler): Promise<void> {
-    if (this._busy) {
-      handler.onError('Another prompt is already in progress on this session');
+  async sendPrompt(sessionId: string, text: string, handler: AcpMessageHandler): Promise<void> {
+    if (!this.connection) {
+      handler.onError(this._lastError || 'ACP not connected');
       return;
     }
 
-    const sid = this.sessionId;
-    if (!this.connection || !sid) {
-      handler.onError(this._lastError || 'ACP session not ready');
-      return;
-    }
-
-    this._busy = true;
     try {
-      this.client?.setSessionHandler(handler);
+      this.client?.setSessionHandler(sessionId, handler);
 
-      const result = await this.connection.prompt({
-        sessionId: sid,
+      await this.connection.prompt({
+        sessionId,
         prompt: [{ type: 'text', text }],
       });
 
       await this.awaitIdle(300, 60000);
-      this.client?.clearSessionHandler();
+      this.client?.clearSessionHandler(sessionId);
 
-      handler.onDone(result.stopReason || 'end_turn');
+      handler.onDone('end_turn');
     } catch (err: any) {
       handler.onError(err?.message || 'ACP prompt failed');
-    } finally {
-      this._busy = false;
     }
   }
 
-  async cancel(): Promise<void> {
-    if (!this.connection || !this.sessionId) return;
+  async cancel(sessionId: string): Promise<void> {
+    if (!this.connection) return;
     try {
-      await this.connection.cancel({ sessionId: this.sessionId });
+      await this.connection.cancel({ sessionId });
     } catch {}
   }
 
-  async closeSession(): Promise<void> {
-    if (this.connection && this.sessionId) {
+  async closeSession(sessionId: string): Promise<void> {
+    if (this.connection) {
       try {
-        await this.connection.closeSession({ sessionId: this.sessionId });
+        await this.connection.closeSession({ sessionId });
       } catch {}
     }
-    this.sessionId = null;
   }
 
   async dispose(): Promise<void> {
-    await this.closeSession();
     this.client = null;
     this.connection = null;
     this.agentManager.stopAgent();

@@ -1980,7 +1980,7 @@ export const createServer = async (port: number, host: string = '127.0.0.1') => 
 
       return { sources: sources.slice(0, 10), flows: flowsText };
     };
-    app.post('/api/qa', createQaEndpointFn(resolveRepo, resolveLLMConfigFn, searchCodebase));
+    app.post('/api/qa', createQaEndpointFn(resolveRepo, resolveLLMConfigFn, searchCodebase, () => listRegisteredRepos()));
   }
 
   let sendLandingPageFn: ((req: any, res: any) => Promise<void>) | null = null;

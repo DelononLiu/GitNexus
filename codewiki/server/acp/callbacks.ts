@@ -9,20 +9,20 @@ function log(level: string, msg: string, data?: Record<string, unknown>) {
 }
 
 export class CodeWikiACPClient implements acp.Client {
-  private sessionHandler: AcpMessageHandler | null = null;
+  private sessionHandlers = new Map<string, AcpMessageHandler>();
   private _lastActivityTime = 0;
 
   get lastActivityTime(): number {
     return this._lastActivityTime;
   }
 
-  setSessionHandler(handler: AcpMessageHandler) {
-    this.sessionHandler = handler;
+  setSessionHandler(sessionId: string, handler: AcpMessageHandler) {
+    this.sessionHandlers.set(sessionId, handler);
     this._lastActivityTime = Date.now();
   }
 
-  clearSessionHandler() {
-    this.sessionHandler = null;
+  clearSessionHandler(sessionId: string) {
+    this.sessionHandlers.delete(sessionId);
   }
 
   async requestPermission(params: acp.RequestPermissionRequest): Promise<acp.RequestPermissionResponse> {
@@ -36,10 +36,11 @@ export class CodeWikiACPClient implements acp.Client {
 
   async sessionUpdate(params: acp.SessionNotification): Promise<void> {
     this._lastActivityTime = Date.now();
+    const sessionId = (params as any).sessionId;
+    const handler = sessionId ? this.sessionHandlers.get(sessionId) : null;
+    if (!handler) return;
 
     const update = params.update;
-    const handler = this.sessionHandler;
-    if (!handler) return;
 
     switch (update.sessionUpdate) {
       case 'agent_message_chunk':
