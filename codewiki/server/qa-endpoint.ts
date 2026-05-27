@@ -10,6 +10,7 @@ interface QaMessage { role: string; content: string }
 interface QaSession {
   id: string;
   messages: QaMessage[];
+  sources: any[];
   repo?: string;
   createdAt: string;
   updatedAt: string;
@@ -32,7 +33,7 @@ function generateSessionId(): string {
 }
 
 function sessionToJson(s: QaSession): Record<string, unknown> {
-  return { id: s.id, repo: s.repo, messages: s.messages, createdAt: s.createdAt, updatedAt: s.updatedAt };
+  return { id: s.id, repo: s.repo, messages: s.messages, sources: s.sources, createdAt: s.createdAt, updatedAt: s.updatedAt };
 }
 
 function sessionFromJson(data: Record<string, unknown>): QaSession {
@@ -40,6 +41,7 @@ function sessionFromJson(data: Record<string, unknown>): QaSession {
     id: data.id as string,
     repo: data.repo as string | undefined,
     messages: (data.messages || []) as QaMessage[],
+    sources: (data.sources || []) as any[],
     createdAt: data.createdAt as string,
     updatedAt: data.updatedAt as string,
   };
@@ -379,7 +381,7 @@ export function createQaEndpoint(
     let session = sessionId ? sessions.get(sessionId) : undefined;
     if (!session) {
       sessionId = generateSessionId();
-      session = { id: sessionId, messages: [], repo: repoName, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+      session = { id: sessionId, messages: [], sources: [], repo: repoName, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
       sessions.set(sessionId, session);
       saveSession(session);
     }
@@ -516,9 +518,11 @@ export function createQaEndpoint(
           if (content && !aborted) {
             session.messages.push({ role: 'assistant', content });
             session.updatedAt = new Date().toISOString();
-            saveSession(session);
             const repoBase = entry ? path.dirname(entry.storagePath) : null;
             const resolvedSources = await resolveAnswerSources(content, sources, repoBase);
+            const finalSources = resolvedSources.length > sources.length ? resolvedSources : sources;
+            session.sources = finalSources;
+            saveSession(session);
             if (resolvedSources.length > sources.length) {
               res.write('data: ' + JSON.stringify({ type: 'sources', sources: resolvedSources }) + '\n\n');
             }
@@ -619,9 +623,11 @@ export function createQaEndpoint(
       if (assistantContent) {
         session.messages.push({ role: 'assistant', content: assistantContent });
         session.updatedAt = new Date().toISOString();
-        saveSession(session);
         const repoBase = entry ? path.dirname(entry.storagePath) : null;
         const resolvedSources = await resolveAnswerSources(assistantContent, sources, repoBase);
+        const finalSources = resolvedSources.length > sources.length ? resolvedSources : sources;
+        session.sources = finalSources;
+        saveSession(session);
         if (resolvedSources.length > sources.length) {
           res.write('data: ' + JSON.stringify({ type: 'sources', sources: resolvedSources }) + '\n\n');
         }

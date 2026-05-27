@@ -708,17 +708,23 @@ async function restoreSession(sessionId) {
     const session = await resp.json();
     if (!session.messages || session.messages.length === 0) return;
     if (session.repo) currentRepo = session.repo;
+    let lastBlockId = null;
     for (let i = 0; i < session.messages.length; i += 2) {
       const userMsg = session.messages[i];
       const asstMsg = session.messages[i + 1];
       if (userMsg?.role !== 'user') continue;
-      createSessionBlock(userMsg.content);
+      const blockId = createSessionBlock(userMsg.content);
+      lastBlockId = blockId;
       if (asstMsg?.role === 'assistant') {
-        updateAnswerContent('block-' + blockCounter, asstMsg.content);
+        updateAnswerContent(blockId, asstMsg.content);
       }
     }
     for (const m of session.messages) {
       messages.push(m);
+    }
+    if (session.sources && session.sources.length > 0 && lastBlockId) {
+      populateFileList(lastBlockId, session.sources);
+      processFileRefs(document.getElementById('answer-' + lastBlockId), lastBlockId);
     }
   } catch {}
 }

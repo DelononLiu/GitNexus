@@ -2001,7 +2001,7 @@ export const createServer = async (port: number, host: string = '127.0.0.1') => 
     app.get('/api/qa/session/:id', (req, res) => {
       const session = getSessionFn!(req.params.id);
       if (!session) { res.status(404).json({ error: 'Session not found' }); return; }
-      res.json({ id: session.id, messages: session.messages, repo: session.repo, createdAt: session.createdAt });
+      res.json({ id: session.id, messages: session.messages, sources: session.sources, repo: session.repo, createdAt: session.createdAt, updatedAt: session.updatedAt });
     });
   }
 
