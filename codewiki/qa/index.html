@@ -424,6 +424,7 @@ function setTyping(typing) {
 function navigateToSource(blockId, refId) {
   const panel = document.getElementById('rightPanel');
   const fileItem = document.getElementById('filesGlobal').querySelector('.file-list-item[data-source-id="' + refId + '"]');
+  console.log('[nav] refId=' + refId + ' found=', !!fileItem, 'label=', fileItem?.querySelector('.file-item-name')?.textContent, 'lines=', fileItem?.querySelector('.file-item-lines')?.textContent);
   if (!fileItem) return false;
 
   fileItem.classList.add('source-highlight');
@@ -441,10 +442,13 @@ function processFileRefs(rootEl, blockId) {
   if (!sources || sources.length === 0) return;
 
   const nameToRef = {};
+  const lineToRef = {};
   for (const src of sources) {
     nameToRef[src.fileName] = src.refId ?? src.fileName;
+    lineToRef[src.fileName + ':' + src.startLine] = src.refId ?? src.fileName;
     if (src.filePath && src.filePath !== src.fileName) {
       nameToRef[src.filePath] = src.refId ?? src.filePath;
+      lineToRef[src.filePath + ':' + src.startLine] = src.refId ?? src.filePath;
     }
   }
 
@@ -471,7 +475,7 @@ function processFileRefs(rootEl, blockId) {
 
   for (const textNode of toReplace) {
     const html = textNode.textContent.replace(pattern, function(match, fileName, line, endLine) {
-      var refId = nameToRef[fileName];
+      var refId = lineToRef[fileName + ':' + line] ?? nameToRef[fileName];
       var displayName = fileName.split('/').pop() || fileName;
       var displayText = displayName + ':' + line + (endLine ? '-' + endLine : '');
       return '<a class="file-ref" href="javascript:void(0)" onclick="return navigateToSource(\'' + blockId + '\', ' + refId + ')" data-source-id="' + displayName + '">' + displayText + '</a>';
