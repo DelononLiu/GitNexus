@@ -443,29 +443,26 @@ function processFileRefs(rootEl, blockId) {
   const nameToRef = {};
   for (const src of sources) {
     nameToRef[src.fileName] = src.refId ?? src.fileName;
+    if (src.filePath && src.filePath !== src.fileName) {
+      nameToRef[src.filePath] = src.refId ?? src.filePath;
+    }
   }
 
-  const fileNames = Object.keys(nameToRef);
-  if (fileNames.length === 0) return;
-  const escaped = fileNames.map(function(fn) {
+  const patterns = Object.keys(nameToRef);
+  if (patterns.length === 0) return;
+  patterns.sort(function(a, b) { return b.length - a.length; });
+  var escaped = patterns.map(function(fn) {
     return fn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   });
-  const pattern = new RegExp('\\b(' + escaped.join('|') + '):(\\d+)(?:-(\\d+))?\\b', 'g');
+  var pattern = new RegExp('\\b(' + escaped.join('|') + '):(\\d+)(?:-(\\d+))?\\b', 'g');
 
-  const walker = document.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT, {
-    acceptNode: function(node) {
-      if (node.parentElement && (node.parentElement.tagName === 'CODE' || node.parentElement.tagName === 'PRE')) {
-        return NodeFilter.FILTER_REJECT;
-      }
-      return NodeFilter.FILTER_ACCEPT;
-    }
-  });
+  var walker = document.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT, null);
 
-  const toReplace = [];
+  var toReplace = [];
   while (walker.nextNode()) {
     var txt = walker.currentNode.textContent;
-    for (var fi = 0; fi < fileNames.length; fi++) {
-      if (txt.indexOf(fileNames[fi] + ':') !== -1) {
+    for (var fi = 0; fi < patterns.length; fi++) {
+      if (txt.indexOf(patterns[fi] + ':') !== -1) {
         toReplace.push(walker.currentNode);
         break;
       }
@@ -475,7 +472,9 @@ function processFileRefs(rootEl, blockId) {
   for (const textNode of toReplace) {
     const html = textNode.textContent.replace(pattern, function(match, fileName, line, endLine) {
       var refId = nameToRef[fileName];
-      return '<a class="file-ref" href="javascript:void(0)" onclick="return navigateToSource(\'' + blockId + '\', ' + refId + ')" data-source-id="' + fileName + '">' + match + '</a>';
+      var displayName = fileName.split('/').pop() || fileName;
+      var displayText = displayName + ':' + line + (endLine ? '-' + endLine : '');
+      return '<a class="file-ref" href="javascript:void(0)" onclick="return navigateToSource(\'' + blockId + '\', ' + refId + ')" data-source-id="' + displayName + '">' + displayText + '</a>';
     });
     const span = document.createElement('span');
     span.innerHTML = html;

@@ -137,13 +137,11 @@ async function ensureAcpClient(cwd: string): Promise<AcpClient | null> {
 function buildPrompt(
   question: string,
   systemPrompt: string,
-  history: { role: string; content: string }[],
+  isFirstTurn: boolean,
 ): string {
   const parts: string[] = [];
-  parts.push('<system>\n' + systemPrompt + '\n</system>');
-  for (const h of history) {
-    const tag = h.role === 'user' ? 'user' : 'assistant';
-    parts.push('<' + tag + '>\n' + h.content + '\n</' + tag + '>');
+  if (isFirstTurn) {
+    parts.push('<system>\n' + systemPrompt + '\n</system>');
   }
   parts.push('<user>\n' + question + '\n</user>');
   return parts.join('\n\n');
@@ -153,7 +151,7 @@ async function acpPrompt(
   client: AcpClient,
   question: string,
   systemPrompt: string,
-  history: { role: string; content: string }[],
+  isFirstTurn: boolean,
   res: ServerResponse,
 ): Promise<{ content: string; sessionId: string }> {
   const sessionId = await client.ensureSession();
@@ -161,7 +159,7 @@ async function acpPrompt(
     throw new Error('ACP session creation failed');
   }
 
-  const prompt = buildPrompt(question, systemPrompt, history);
+  const prompt = buildPrompt(question, systemPrompt, isFirstTurn);
   let content = '';
 
   const handler: AcpMessageHandler = {
@@ -193,22 +191,39 @@ async function acpPrompt(
 
 const FILE_REF_RE = /([\w./-]+(?:\.[a-zA-Z][\w.-]*)):(\d+)(?:-(\d+))?/g;
 
-function extractFileRefs(text: string): { fileName: string; startLine: number; endLine: number }[] {
-  const refs: { fileName: string; startLine: number; endLine: number }[] = [];
+function extractFileRefs(text: string): { fileName: string; filePath: string; startLine: number; endLine: number }[] {
+  const refs: { fileName: string; filePath: string; startLine: number; endLine: number }[] = [];
   const seen = new Set<string>();
   let m: RegExpExecArray | null;
   FILE_REF_RE.lastIndex = 0;
   while ((m = FILE_REF_RE.exec(text)) !== null) {
-    const fileName = m[1].split('/').pop() || m[1];
+    const filePath = m[1];
+    const fileName = filePath.split('/').pop() || filePath;
     const startLine = parseInt(m[2], 10);
     const endLine = m[3] ? parseInt(m[3], 10) : startLine;
     const key = fileName + ':' + startLine;
     if (!seen.has(key)) {
       seen.add(key);
-      refs.push({ fileName, startLine, endLine });
+      refs.push({ fileName, filePath, startLine, endLine });
     }
   }
   return refs;
+}
+
+async function findFileByBasename(dir: string, basename: string): Promise<string | null> {
+  try {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isFile() && entry.name === basename) return fullPath;
+      if (entry.isDirectory()) {
+        const found = await findFileByBasename(fullPath, basename);
+        if (found) return found;
+      }
+    }
+  } catch {}
+  return null;
 }
 
 async function resolveAnswerSources(
@@ -232,6 +247,7 @@ async function resolveAnswerSources(
     if (existingKeys.has(key)) continue;
 
     const candidatePaths = [
+      path.join(repoBase, ref.filePath),
       path.join(repoBase, ref.fileName),
       path.join(repoBase, 'src', ref.fileName),
       path.join(repoBase, 'lib', ref.fileName),
@@ -251,6 +267,19 @@ async function resolveAnswerSources(
           break;
         }
       } catch {}
+    }
+    if (!snippet) {
+      const found = await findFileByBasename(repoBase, ref.fileName);
+      if (found) {
+        try {
+          filePath = found;
+          const srcContent = await fs.readFile(found, 'utf-8');
+          const srcLines = srcContent.split('\n');
+          const start = Math.max(0, ref.startLine - 2);
+          const end = Math.min(srcLines.length, ref.endLine + 2);
+          snippet = srcLines.slice(start, end).map((l, i) => (start + i + 1) + ': ' + l).join('\n');
+        } catch {}
+      }
     }
     if (!snippet) continue;
 
@@ -481,7 +510,7 @@ export function createQaEndpoint(
       s.fileName + (s.startLine ? ':' + s.startLine + (s.endLine && s.endLine !== s.startLine ? '-' + s.endLine : '') : '')
     ).join(', ');
 
-    const systemPrompt = 'You are Nexus, a code analyst. Answer the question in DeepWiki style.\n\n' +
+    const systemPrompt = 'You are codewiki, a code analyst. Answer the question in DeepWiki style.\n\n' +
       '## RULES\n' +
       structure + '\n' +
       '- Always answer in Chinese.\n' +
@@ -492,19 +521,14 @@ export function createQaEndpoint(
       '- Do not restate the question.\n' +
       '- If unsure, say so.\n' +
       '- 禁止写文件，所有内容直接输出。\n' +
-      '- 引用格式：在句子末尾用（fileName:line）引用单个文件，如"该函数接收两个参数（cli-commands-table.md:5）"。\n' +
-      '- 范围引用用（fileName:start-end）。每个括号内只放一个文件，不允许用逗号分隔多个文件。\n' +
-      '- 只引用文件名（不含路径），如 main.ts 而非 src/main.ts。引用必须紧贴句子末尾，不要插在句子中间。\n\n' +
-      '## ABOUT THIS QUERY\n' +
-      'The user asked in Chinese. For search purposes, an English translation was appended to the original question. The SEARCH RESULTS below come from this bilingual query. Base your answer on the actual source code and flows shown in SEARCH RESULTS and EXECUTION FLOWS — not on general knowledge.\n\n' +
-      '## SOURCE REFERENCES\n' +
-      sourceRefs + '\n\n' +
-      '## SEARCH RESULTS\n' +
-      (searchContent.slice(0, 5000) || 'No specific search results found for this query.') + '\n\n' +
-      '## EXECUTION FLOWS\n' +
-      (flowsText || 'No process flows found for this query.') + '\n\n' +
-      '## WIKI CONTEXT\n' +
-      (wikiContext ? wikiContext.slice(0, 3000) : 'No wiki documentation available.');
+      '- 禁止使用 Explore Task。\n' +
+      '- **问题相关信息搜索链路：gitnexus_query（自然语言探索执行流）→ gitnexus_cypher（精确图模式验证）→ gitnexus_context（单符号深度分析）→ grep（纯文本 fallback/提取）**\n' + 
+      '- 每个回答至少包含 2 个引用，最多包含 6 个引用。\n' +
+      '- 引用格式：在句子末尾用 (fileName:line) 引用，如 "该函数接收两个参数 (gitnexus/src/core/search/hybrid-search.ts:175)"\n' +
+      '- 范围引用用 (fileName:start-end)，如 (schema.ts:4-9)\n' +
+      '- **重要：每个括号内只放一个文件+一个范围，绝对禁止逗号分隔多个范围。** 错误示例：(file.ts:1,5,10) 或 (file.ts:1-3,5-8)。如果要引用多个范围，请分开成多个括号引用。\n' +
+      '- 引用文件路径使用相对路径，如 gitnexus/src/core/search/bm25-index.ts:60。**绝对禁止只写文件名**，错误示例：bm25-index.ts:60。引用必须紧贴句子末尾，不要插在句子中间。\n' + 
+      '> 引用不要用反引号包裹！错误示例：\`(file.ts:1)\`。正确：(file.ts:1)。\n\n';
 
     if (ACP_ENABLED) {
       const repoRoot = entry ? path.dirname(entry.storagePath) : process.cwd();
@@ -514,11 +538,13 @@ export function createQaEndpoint(
         req.on('close', () => { aborted = true; client.cancel(); });
 
         try {
-          const { content } = await acpPrompt(client, question, systemPrompt, history, res);
+          const isFirstTurn = session.messages.length <= 1;
+          const { content } = await acpPrompt(client, question, systemPrompt, isFirstTurn, res);
           if (content && !aborted) {
             session.messages.push({ role: 'assistant', content });
             session.updatedAt = new Date().toISOString();
             const repoBase = entry ? path.dirname(entry.storagePath) : null;
+            log('debug', 'ACP content sample', { len: content.length, sample: content.replace(/[\r\n]/g, ' ').slice(0, 500) });
             const resolvedSources = await resolveAnswerSources(content, sources, repoBase);
             const finalSources = resolvedSources.length > sources.length ? resolvedSources : sources;
             session.sources = finalSources;
@@ -625,6 +651,7 @@ export function createQaEndpoint(
         session.updatedAt = new Date().toISOString();
         const repoBase = entry ? path.dirname(entry.storagePath) : null;
         const resolvedSources = await resolveAnswerSources(assistantContent, sources, repoBase);
+        log('debug', 'resolveAnswerSources done', { sourcesLen: sources.length, resolvedLen: resolvedSources.length, repoBase: repoBase ?? '(null)' });
         const finalSources = resolvedSources.length > sources.length ? resolvedSources : sources;
         session.sources = finalSources;
         saveSession(session);
