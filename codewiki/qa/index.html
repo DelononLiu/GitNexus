@@ -233,7 +233,6 @@ a.file-ref:hover{text-decoration:underline;border-bottom-style:solid}
   </div>
 </div>
 
-<div id="qaDebug" style="position:fixed;bottom:100px;left:16px;z-index:999;max-height:200px;width:400px;overflow-y:auto;background:rgba(0,0,0,0.85);color:#0f0;font-family:monospace;font-size:11px;padding:8px 10px;border-radius:6px"></div>
 <script>
 const messages = [];
 let isLoading = false;
@@ -245,15 +244,6 @@ const form = document.getElementById('qaForm');
 const input = document.getElementById('qaInput');
 const sendBtn = document.getElementById('sendBtn');
 const mainScroll = document.getElementById('messagesInner');
-
-function logDebug(label, detail) {
-  const el = document.getElementById('qaDebug');
-  if (!el) return;
-  const line = document.createElement('div');
-  line.textContent = '[' + new Date().toLocaleTimeString() + '] ' + label + (detail ? ': ' + detail : '');
-  el.appendChild(line);
-  el.scrollTop = el.scrollHeight;
-}
 
 function escapeHtml(str) {
   const d = document.createElement('div');
@@ -595,9 +585,7 @@ async function sendMessage(e) {
             currentSessionId = data.id;
             const sessionUrl = '/codewiki/qa/' + currentSessionId;
             history.replaceState(null, '', sessionUrl);
-            logDebug('session created', sessionUrl);
           } else if (data.type === 'sources') {
-            logDebug('sources event', 'count=' + (data.sources?.length ?? 0) + ' blockId=' + currentBlockId);
             if (currentBlockId) {
               populateFileList(currentBlockId, data.sources);
               processFileRefs(document.getElementById('answer-' + currentBlockId), currentBlockId);
@@ -616,10 +604,8 @@ async function sendMessage(e) {
           } else if (data.type === 'error') {
             showError(data.message || 'An error occurred');
           } else if (data.type === 'done') {
-            logDebug('sse done', '');
           }
         } catch (e) {
-          logDebug('sse parse error', String(e));
         }
       }
     }
@@ -711,7 +697,7 @@ mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose
 const pathRepoMatch = location.pathname.match(/^\/codewiki\/(?!qa\b)([^/]+)\/qa/);
 let currentRepo = pathRepoMatch?.[1] || new URLSearchParams(location.search).get('repo') || undefined;
 
-const sessionMatch = location.pathname.match(/^\/codewiki\/qa\/(\d+)/);
+const sessionMatch = location.pathname.match(/^\/codewiki\/qa\/([^/]+)/);
 const currentSessionIdFromUrl = sessionMatch?.[1] || null;
 
 async function restoreSession(sessionId) {

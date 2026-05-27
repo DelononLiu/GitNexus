@@ -1,5 +1,7 @@
+import crypto from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
+import os from 'os';
 import type { ServerResponse } from 'http';
 import { AcpClient } from './acp/AcpClient.js';
 import type { AcpMessageHandler } from './acp/types.js';
@@ -9,17 +11,99 @@ interface QaSession {
   id: string;
   messages: QaMessage[];
   repo?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const sessions = new Map<string, QaSession>();
-let sessionSeq = 0;
+
+const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+function getDataDir(): string {
+  return process.env.GITNEXUS_QA_DATA_DIR || path.join(os.homedir(), '.gitnexus', 'qa-sessions');
+}
+
+function sessionFilePath(id: string): string {
+  return path.join(getDataDir(), id + '.json');
+}
 
 function generateSessionId(): string {
-  sessionSeq++;
-  return String(sessionSeq);
+  return crypto.randomUUID();
 }
+
+function sessionToJson(s: QaSession): Record<string, unknown> {
+  return { id: s.id, repo: s.repo, messages: s.messages, createdAt: s.createdAt, updatedAt: s.updatedAt };
+}
+
+function sessionFromJson(data: Record<string, unknown>): QaSession {
+  return {
+    id: data.id as string,
+    repo: data.repo as string | undefined,
+    messages: (data.messages || []) as QaMessage[],
+    createdAt: data.createdAt as string,
+    updatedAt: data.updatedAt as string,
+  };
+}
+
+async function saveSession(session: QaSession): Promise<void> {
+  try {
+    const dir = getDataDir();
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(sessionFilePath(session.id), JSON.stringify(sessionToJson(session)), 'utf-8');
+  } catch (e) {
+    log('error', 'failed to save session', { id: session.id, error: (e as Error)?.message });
+  }
+}
+
+async function loadSessions(): Promise<void> {
+  const dir = getDataDir();
+  try {
+    await fs.mkdir(dir, { recursive: true });
+    const files = await fs.readdir(dir);
+    const now = Date.now();
+    for (const f of files) {
+      if (!f.endsWith('.json')) continue;
+      try {
+        const content = await fs.readFile(path.join(dir, f), 'utf-8');
+        const data = JSON.parse(content);
+        const session = sessionFromJson(data);
+        const age = now - new Date(session.updatedAt).getTime();
+        if (age > SESSION_MAX_AGE_MS) {
+          await fs.unlink(path.join(dir, f)).catch(() => {});
+          continue;
+        }
+        sessions.set(session.id, session);
+      } catch {}
+    }
+    log('info', 'loaded sessions', { count: sessions.size, dir });
+  } catch (e) {
+    log('warn', 'no sessions dir', { dir, error: (e as Error)?.message });
+  }
+}
+
+async function cleanupStaleSessions(): Promise<void> {
+  const now = Date.now();
+  const dir = getDataDir();
+  for (const [id, session] of sessions) {
+    const age = now - new Date(session.updatedAt).getTime();
+    if (age > SESSION_MAX_AGE_MS) {
+      sessions.delete(id);
+      try { await fs.unlink(sessionFilePath(id)); } catch {}
+    }
+  }
+  try {
+    const files = await fs.readdir(dir);
+    for (const f of files) {
+      if (!f.endsWith('.json')) continue;
+      const id = f.slice(0, -5);
+      if (!sessions.has(id)) {
+        try { await fs.unlink(path.join(dir, f)); } catch {}
+      }
+    }
+  } catch {}
+}
+
+loadSessions();
 
 export function getSession(id: string): QaSession | undefined {
   return sessions.get(id);
@@ -295,8 +379,9 @@ export function createQaEndpoint(
     let session = sessionId ? sessions.get(sessionId) : undefined;
     if (!session) {
       sessionId = generateSessionId();
-      session = { id: sessionId, messages: [], repo: repoName, createdAt: new Date(), updatedAt: new Date() };
+      session = { id: sessionId, messages: [], repo: repoName, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
       sessions.set(sessionId, session);
+      saveSession(session);
     }
 
     let wikiContext = '';
@@ -384,7 +469,8 @@ export function createQaEndpoint(
     res.write('data: ' + JSON.stringify({ type: 'sources', sources }) + '\n\n');
 
     session.messages.push({ role: 'user', content: question });
-    session.updatedAt = new Date();
+    session.updatedAt = new Date().toISOString();
+    saveSession(session);
 
     const qType = classifyQuestion(question);
     const structure = structureGuide(qType);
@@ -429,7 +515,8 @@ export function createQaEndpoint(
           const { content } = await acpPrompt(client, question, systemPrompt, history, res);
           if (content && !aborted) {
             session.messages.push({ role: 'assistant', content });
-            session.updatedAt = new Date();
+            session.updatedAt = new Date().toISOString();
+            saveSession(session);
             const repoBase = entry ? path.dirname(entry.storagePath) : null;
             const resolvedSources = await resolveAnswerSources(content, sources, repoBase);
             if (resolvedSources.length > sources.length) {
@@ -531,7 +618,8 @@ export function createQaEndpoint(
 
       if (assistantContent) {
         session.messages.push({ role: 'assistant', content: assistantContent });
-        session.updatedAt = new Date();
+        session.updatedAt = new Date().toISOString();
+        saveSession(session);
         const repoBase = entry ? path.dirname(entry.storagePath) : null;
         const resolvedSources = await resolveAnswerSources(assistantContent, sources, repoBase);
         if (resolvedSources.length > sources.length) {
