@@ -101,13 +101,21 @@ export class AcpClient {
     }
   }
 
+  private _busy = false;
+
   async sendPrompt(text: string, handler: AcpMessageHandler): Promise<void> {
+    if (this._busy) {
+      handler.onError('Another prompt is already in progress on this session');
+      return;
+    }
+
     const sid = this.sessionId;
     if (!this.connection || !sid) {
       handler.onError(this._lastError || 'ACP session not ready');
       return;
     }
 
+    this._busy = true;
     try {
       this.client?.setSessionHandler(handler);
 
@@ -116,12 +124,14 @@ export class AcpClient {
         prompt: [{ type: 'text', text }],
       });
 
-      await this.awaitIdle(300, 5000);
+      await this.awaitIdle(300, 60000);
       this.client?.clearSessionHandler();
 
       handler.onDone(result.stopReason || 'end_turn');
     } catch (err: any) {
       handler.onError(err?.message || 'ACP prompt failed');
+    } finally {
+      this._busy = false;
     }
   }
 
@@ -152,6 +162,11 @@ export class AcpClient {
   private async awaitIdle(idleMs: number, maxMs: number): Promise<void> {
     const start = Date.now();
     while (Date.now() - start < maxMs) {
+      const lastActivity = this.client?.lastActivityTime ?? 0;
+      if (lastActivity > 0) {
+        const inactive = Date.now() - lastActivity;
+        if (inactive >= idleMs) break;
+      }
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
   }

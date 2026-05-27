@@ -10,9 +10,15 @@ function log(level: string, msg: string, data?: Record<string, unknown>) {
 
 export class CodeWikiACPClient implements acp.Client {
   private sessionHandler: AcpMessageHandler | null = null;
+  private _lastActivityTime = 0;
+
+  get lastActivityTime(): number {
+    return this._lastActivityTime;
+  }
 
   setSessionHandler(handler: AcpMessageHandler) {
     this.sessionHandler = handler;
+    this._lastActivityTime = Date.now();
   }
 
   clearSessionHandler() {
@@ -29,6 +35,8 @@ export class CodeWikiACPClient implements acp.Client {
   }
 
   async sessionUpdate(params: acp.SessionNotification): Promise<void> {
+    this._lastActivityTime = Date.now();
+
     const update = params.update;
     const handler = this.sessionHandler;
     if (!handler) return;
