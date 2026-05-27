@@ -403,6 +403,7 @@ export function createQaEndpoint(
       '- Keep paragraphs short (2-4 sentences).\n' +
       '- Do not restate the question.\n' +
       '- If unsure, say so.\n' +
+      '- 禁止写文件，所有内容直接输出。\n' +
       '- 引用格式：在句子末尾用（fileName:line）引用单个文件，如"该函数接收两个参数（cli-commands-table.md:5）"。\n' +
       '- 范围引用用（fileName:start-end）。每个括号内只放一个文件，不允许用逗号分隔多个文件。\n' +
       '- 只引用文件名（不含路径），如 main.ts 而非 src/main.ts。引用必须紧贴句子末尾，不要插在句子中间。\n\n' +
