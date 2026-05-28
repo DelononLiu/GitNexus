@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Code Q&A — GitNexus</title>
+<title>CodeWiki Q&A</title>
 <script src="/vendor/marked.min.js"></script>
 <script src="/vendor/highlight.min.js"></script>
 <script src="/vendor/mermaid.min.js"></script>
@@ -62,6 +62,7 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-seri
 .header-inner{display:flex;align-items:center;justify-content:space-between;padding:14px 0}
 .header-left{display:flex;align-items:center;gap:10px}
 .header-left h1{font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px}
+.header-repo-name{font-size:11px;color:var(--color-text-secondary);font-weight:500;padding:3px 8px;border-radius:4px;background:var(--bg-secondary)}
 .header-right{display:flex;align-items:center;gap:10px}
 .btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:6px;font-size:13px;cursor:pointer;border:1px solid var(--color-border);background:transparent;color:var(--color-text-primary);transition:all .15s}
 .btn:hover{background:var(--bg-secondary)}
@@ -186,10 +187,8 @@ a.file-ref:hover{text-decoration:underline;border-bottom-style:solid}
   <div class="container-wrapper">
     <div class="header-inner">
       <div class="header-left">
-        <h1>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
-          Code Q&amp;A
-        </h1>
+        <h1>CodeWiki</h1>
+        <span class="header-repo-name" id="headerRepoName"></span>
       </div>
       <div class="header-right">
         <button class="btn" onclick="goToWiki()">Wiki</button>
@@ -699,6 +698,8 @@ mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose
 
 const pathRepoMatch = location.pathname.match(/^\/codewiki\/(?!qa\b)([^/]+)\/qa/);
 let currentRepo = pathRepoMatch?.[1] || new URLSearchParams(location.search).get('repo') || undefined;
+const headerRepoName = document.getElementById('headerRepoName');
+if (currentRepo) { headerRepoName.textContent = currentRepo; document.title = currentRepo + ' — CodeWiki Q&A'; }
 
 const sessionMatch = location.pathname.match(/^\/codewiki\/qa\/([^/]+)/);
 const currentSessionIdFromUrl = sessionMatch?.[1] || null;
@@ -710,7 +711,7 @@ async function restoreSession(sessionId) {
     if (!resp.ok) return;
     const session = await resp.json();
     if (!session.messages || session.messages.length === 0) return;
-    if (session.repo) currentRepo = session.repo;
+    if (session.repo) { currentRepo = session.repo; headerRepoName.textContent = session.repo; }
     let lastBlockId = null;
     for (let i = 0; i < session.messages.length; i += 2) {
       const userMsg = session.messages[i];

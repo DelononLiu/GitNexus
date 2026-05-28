@@ -1,0 +1,9 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "mcp": {
+    "gitnexus": {
+      "type": "local",
+      "command": ["gitnexus", "mcp"]
+    }
+  }
+}
