@@ -1994,6 +1994,8 @@ export const createServer = async (port: number, host: string = '127.0.0.1') => 
   // DeepWiki-style URL routes
   app.get('/codewiki', (req, res) => sendLandingPageFn?.(req, res) ?? res.status(404).end());
   app.get('/codewiki/', (req, res) => sendLandingPageFn?.(req, res) ?? res.status(404).end());
+  app.get('/codewiki/qa', sendQaPage);
+  app.get('/codewiki/qa/', sendQaPage);
   app.get('/codewiki/:repo/qa', sendQaPage);
   app.get('/codewiki/qa/:id', sendQaPage);
 

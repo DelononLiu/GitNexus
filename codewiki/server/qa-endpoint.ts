@@ -211,6 +211,7 @@ async function acpPrompt(
 }
 
 const FILE_REF_RE = /([\w./-]+(?:\.[a-zA-Z][\w.-]*)):(\d+)(?:-(\d+))?/g;
+const CROSS_REPO_FILE_REF_RE = /([\w-]+):([\w./-]+\.[a-zA-Z][\w.-]*):(\d+)(?:-(\d+))?/g;
 
 function extractFileRefs(text: string): { fileName: string; filePath: string; startLine: number; endLine: number }[] {
   const refs: { fileName: string; filePath: string; startLine: number; endLine: number }[] = [];
@@ -251,7 +252,11 @@ async function resolveAnswerSources(
   content: string,
   existingSources: any[],
   repoBase: string | null,
+  repoBases?: Map<string, string>,
 ): Promise<any[]> {
+  if (repoBases) {
+    return resolveCrossRepoSources(content, existingSources, repoBases);
+  }
   const refs = extractFileRefs(content);
   if (!repoBase || refs.length === 0) return existingSources;
 
@@ -311,6 +316,104 @@ async function resolveAnswerSources(
       startLine: ref.startLine,
       endLine: ref.endLine,
       fileName: ref.fileName,
+      snippet,
+      refId: refId++,
+    });
+  }
+  return merged;
+}
+
+async function resolveCrossRepoSources(
+  content: string,
+  existingSources: any[],
+  repoBases: Map<string, string>,
+): Promise<any[]> {
+  const refs: { repoName: string; fileName: string; filePath: string; startLine: number; endLine: number }[] = [];
+  const seen = new Set<string>();
+  let m: RegExpExecArray | null;
+  const savedLastIndex = CROSS_REPO_FILE_REF_RE.lastIndex;
+  CROSS_REPO_FILE_REF_RE.lastIndex = 0;
+  log('info', 'resolveCrossRepoSources', { contentLen: content.length, existingCount: existingSources.length, repoBases: Array.from(repoBases.keys()) });
+  while ((m = CROSS_REPO_FILE_REF_RE.exec(content)) !== null) {
+    const repoName = m[1];
+    const filePath = m[2];
+    const fileName = filePath.split('/').pop() || filePath;
+    const startLine = parseInt(m[3], 10);
+    const endLine = m[4] ? parseInt(m[4], 10) : startLine;
+    const key = repoName + ':' + fileName + ':' + startLine;
+    if (!seen.has(key)) {
+      seen.add(key);
+      refs.push({ repoName, fileName, filePath, startLine, endLine });
+    }
+  }
+  CROSS_REPO_FILE_REF_RE.lastIndex = savedLastIndex;
+  log('info', 'resolveCrossRepoSources: refs extracted', { refCount: refs.length });
+
+  if (refs.length === 0) {
+    log('info', 'resolveCrossRepoSources: no refs in answer, check CROSS_REPO_FILE_REF_RE regex', { sample: content.slice(0, 200) });
+    return existingSources;
+  }
+
+  const merged = [...existingSources];
+  const existingKeys = new Set<string>();
+  for (const s of existingSources) {
+    const k = (s.repo ?? '') + ':' + s.fileName + ':' + (s.startLine ?? '');
+    existingKeys.add(k);
+  }
+
+  let refId = existingSources.length;
+  for (const ref of refs) {
+    const key = ref.repoName + ':' + ref.fileName + ':' + ref.startLine;
+    if (existingKeys.has(key)) continue;
+
+    const repoBase = repoBases.get(ref.repoName);
+    if (!repoBase) continue;
+
+    const candidatePaths = [
+      path.join(repoBase, ref.filePath),
+      path.join(repoBase, ref.fileName),
+      path.join(repoBase, 'src', ref.fileName),
+      path.join(repoBase, 'lib', ref.fileName),
+    ];
+    let snippet = '';
+    let filePath = '';
+    for (const cp of candidatePaths) {
+      try {
+        const stat = await fs.stat(cp);
+        if (stat.isFile()) {
+          filePath = cp;
+          const srcContent = await fs.readFile(cp, 'utf-8');
+          const srcLines = srcContent.split('\n');
+          const start = Math.max(0, ref.startLine - 2);
+          const end = Math.min(srcLines.length, ref.endLine + 2);
+          snippet = srcLines.slice(start, end).map((l, i) => (start + i + 1) + ': ' + l).join('\n');
+          break;
+        }
+      } catch {}
+    }
+    if (!snippet) {
+      const found = await findFileByBasename(repoBase, ref.fileName);
+      if (found) {
+        try {
+          filePath = found;
+          const srcContent = await fs.readFile(found, 'utf-8');
+          const srcLines = srcContent.split('\n');
+          const start = Math.max(0, ref.startLine - 2);
+          const end = Math.min(srcLines.length, ref.endLine + 2);
+          snippet = srcLines.slice(start, end).map((l, i) => (start + i + 1) + ': ' + l).join('\n');
+        } catch {}
+      }
+    }
+    if (!snippet) continue;
+
+    existingKeys.add(key);
+    merged.push({
+      repo: ref.repoName,
+      filePath: ref.repoName + ':' + (filePath ? path.relative(repoBase, filePath) : ref.fileName),
+      label: 'File',
+      startLine: ref.startLine,
+      endLine: ref.endLine,
+      fileName: ref.repoName + ':' + ref.fileName,
       snippet,
       refId: refId++,
     });
@@ -451,13 +554,20 @@ export function createQaEndpoint(
       saveSession(session);
     }
 
+    const isCrossRepo = !repoName && !!listRepos;
     let wikiContext = '';
-    const entry = await resolveRepo(repoName);
-    if (entry) {
-      const overviewPath = path.join(entry.storagePath, 'wiki', 'overview.md');
-      try {
-        wikiContext = await fs.readFile(overviewPath, 'utf-8');
-      } catch {}
+    let entry = undefined;
+    if (isCrossRepo) {
+      const allRepos = await listRepos!();
+      log('info', 'cross-repo mode', { repoCount: allRepos.length, names: allRepos.map(r => r.name) });
+    } else {
+      entry = await resolveRepo(repoName);
+      if (entry) {
+        const overviewPath = path.join(entry.storagePath, 'wiki', 'overview.md');
+        try {
+          wikiContext = await fs.readFile(overviewPath, 'utf-8');
+        } catch {}
+      }
     }
 
     let llmConfig: any = undefined;
@@ -484,42 +594,114 @@ export function createQaEndpoint(
     let sources: any[] = [];
     let searchContent = '';
     let flowsText = '';
+    let repoBaseMap: Map<string, string> | undefined = undefined;
     try {
-      const { sources: searchResults, flows: rawFlows = '' } = await search(searchQuery, repoName);
-      flowsText = rawFlows;
-      if (searchResults.length > 0) {
-        const repoBase = entry ? path.dirname(entry.storagePath) : null;
-        const topResults = searchResults.slice(0, 5);
-        const lines: string[] = [];
-        for (const r of topResults) {
-          lines.push((r.label ?? 'File') + ': ' + (r.name ?? r.filePath?.split('/').pop() ?? '?') +
-            ' — ' + r.filePath + (r.startLine ? ':' + r.startLine : ''));
-          const refId = sources.length;
-          const sourceEntry: any = {
-            filePath: r.filePath,
-            label: r.label ?? 'File',
-            startLine: r.startLine,
-            endLine: r.endLine,
-            fileName: r.filePath?.split('/').pop() ?? '?',
-            snippet: '',
-            refId,
-          };
-          if (repoBase && r.filePath) {
-            const srcPath = path.join(repoBase, r.filePath);
-            try {
-              const srcContent = await fs.readFile(srcPath, 'utf-8');
-              const srcLines = srcContent.split('\n');
-              const start = r.startLine ? Math.max(0, r.startLine - 2) : 0;
-              const end = r.endLine ? Math.min(srcLines.length, r.endLine + 2) : Math.min(srcLines.length, start + 20);
-              const snippet = srcLines.slice(start, end).map((l: string, i: number) =>
-                (start + i + 1) + ': ' + l).join('\n');
-              lines.push('```\n' + snippet + '\n```');
-              sourceEntry.snippet = snippet;
-            } catch {}
+      if (isCrossRepo) {
+        const allRepos = await listRepos!();
+        log('info', 'cross-repo search starting', { repoCount: allRepos.length, query: searchQuery.slice(0, 60) });
+        repoBaseMap = new Map();
+        const allRepoResults: { repoName: string; sources: any[]; flows?: string }[] = [];
+        await Promise.allSettled(allRepos.map(async (r) => {
+          try {
+            const repoEntry = await resolveRepo(r.name);
+            if (!repoEntry) { log('warn', 'cross-repo search: repo not resolved', { repo: r.name }); return; }
+            repoBaseMap!.set(r.name, path.dirname(repoEntry.storagePath));
+            const result = await search(searchQuery, r.name);
+            if (!result || !result.sources?.length) {
+              log('info', 'cross-repo search: no results for repo', { repo: r.name });
+              return;
+            }
+            log('info', 'cross-repo search: repo results', { repo: r.name, count: result.sources.length, first: result.sources[0]?.filePath });
+            allRepoResults.push({ repoName: r.name, sources: result.sources, flows: result.flows });
+          } catch (repoErr) {
+            log('error', 'cross-repo search failed for repo', { repo: r.name, error: (repoErr as Error)?.message });
           }
-          sources.push(sourceEntry);
+        }));
+        const crossSources: any[] = [];
+        for (const r of allRepoResults) {
+          for (const s of r.sources.slice(0, 3)) {
+            crossSources.push({
+              ...s,
+              repo: r.repoName,
+              filePath: r.repoName + ':' + s.filePath,
+              fileName: r.repoName + ':' + (s.fileName ?? s.filePath?.split('/').pop() ?? '?'),
+              refId: crossSources.length,
+              rawPath: s.filePath,
+            });
+          }
+          if (r.flows) flowsText += r.flows + '\n';
+        }
+
+        // Populate snippets for cross-repo sources
+        for (const src of crossSources) {
+          if (src.snippet) continue;
+          const baseDir = repoBaseMap.get(src.repo);
+          if (!baseDir || !src.rawPath) continue;
+          try {
+            const fullPath = path.join(baseDir, src.rawPath);
+            const content = await fs.readFile(fullPath, 'utf-8');
+            const lines = content.split('\n');
+            const start = src.startLine ? Math.max(0, src.startLine - 2) : 0;
+            const end = src.endLine && src.endLine !== src.startLine
+              ? Math.min(lines.length, src.endLine + 2)
+              : Math.min(lines.length, start + 20);
+            if (start < lines.length) {
+              src.snippet = lines.slice(start, end).map((l: string, i: number) =>
+                (start + i + 1) + ': ' + l).join('\n');
+            }
+          } catch {}
+        }
+
+        sources = crossSources.slice(0, 10);
+        log('info', 'cross-repo search done', { totalResults: allRepoResults.length, totalSources: crossSources.length, finalSources: sources.length });
+        if (sources.length > 0) {
+          log('info', 'cross-repo first source', { filePath: sources[0].filePath, fileName: sources[0].fileName, hasSnippet: !!sources[0].snippet, startLine: sources[0].startLine });
+        }
+        const lines: string[] = [];
+        for (const s of sources) {
+          lines.push((s.label ?? 'File') + ': ' + s.fileName + ' — ' + s.filePath + (s.startLine ? ':' + s.startLine : ''));
+          if (s.snippet) {
+            lines.push('```\n' + s.snippet + '\n```');
+          }
         }
         searchContent = lines.join('\n');
+      } else {
+        const { sources: searchResults, flows: rawFlows = '' } = await search(searchQuery, repoName);
+        flowsText = rawFlows;
+        if (searchResults.length > 0) {
+          const repoBase = entry ? path.dirname(entry.storagePath) : null;
+          const topResults = searchResults.slice(0, 5);
+          const lines: string[] = [];
+          for (const r of topResults) {
+            lines.push((r.label ?? 'File') + ': ' + (r.name ?? r.filePath?.split('/').pop() ?? '?') +
+              ' — ' + r.filePath + (r.startLine ? ':' + r.startLine : ''));
+            const refId = sources.length;
+            const sourceEntry: any = {
+              filePath: r.filePath,
+              label: r.label ?? 'File',
+              startLine: r.startLine,
+              endLine: r.endLine,
+              fileName: r.filePath?.split('/').pop() ?? '?',
+              snippet: '',
+              refId,
+            };
+            if (repoBase && r.filePath) {
+              const srcPath = path.join(repoBase, r.filePath);
+              try {
+                const srcContent = await fs.readFile(srcPath, 'utf-8');
+                const srcLines = srcContent.split('\n');
+                const start = r.startLine ? Math.max(0, r.startLine - 2) : 0;
+                const end = r.endLine ? Math.min(srcLines.length, r.endLine + 2) : Math.min(srcLines.length, start + 20);
+                const snippet = srcLines.slice(start, end).map((l: string, i: number) =>
+                  (start + i + 1) + ': ' + l).join('\n');
+                lines.push('```\n' + snippet + '\n```');
+                sourceEntry.snippet = snippet;
+              } catch {}
+            }
+            sources.push(sourceEntry);
+          }
+          searchContent = lines.join('\n');
+        }
       }
     } catch (e) {
       log('error', 'search failed', { error: (e as Error)?.message });
@@ -533,6 +715,10 @@ export function createQaEndpoint(
     res.setHeader('X-Accel-Buffering', 'no');
 
     res.write('data: ' + JSON.stringify({ type: 'session', id: sessionId }) + '\n\n');
+    log('info', 'sending SSE sources', { type: 'sources', count: sources.length, isCrossRepo });
+    if (sources.length > 0) {
+      log('info', 'SSE sources sample', { filePath: sources[0].filePath, fileName: sources[0].fileName, refId: sources[0].refId });
+    }
     res.write('data: ' + JSON.stringify({ type: 'sources', sources }) + '\n\n');
 
     session.messages.push({ role: 'user', content: question });
@@ -542,11 +728,14 @@ export function createQaEndpoint(
     const qType = classifyQuestion(question);
     const structure = structureGuide(qType);
 
-    const sourceRefs = sources.map((s, i) =>
-      s.fileName + (s.startLine ? ':' + s.startLine + (s.endLine && s.endLine !== s.startLine ? '-' + s.endLine : '') : '')
-    ).join(', ');
+    const sourceRefs = sources.map(s =>
+      s.filePath + (s.startLine ? ':' + s.startLine + (s.endLine && s.endLine !== s.startLine ? '-' + s.endLine : '') : '')
+    ).join('\n- ');
 
     const systemPrompt = 'You are codewiki, a code analyst. Answer the question in DeepWiki style.\n\n' +
+      '## SEARCH CONTEXT\n' +
+      'The following files were found across repositories. ONLY reference files from this list:\n\n' +
+      '- ' + sourceRefs + (flowsText ? '\n\n### Execution Flows\n' + flowsText.slice(0, 2000) : '') + '\n\n' +
       '## RULES\n' +
       structure + '\n' +
       '- Always answer in Chinese.\n' +
@@ -560,11 +749,21 @@ export function createQaEndpoint(
       '- 禁止使用 Explore Task。\n' +
       '- **问题相关信息搜索链路：gitnexus_query（自然语言探索执行流）→ gitnexus_cypher（精确图模式验证）→ gitnexus_context（单符号深度分析）→ grep（纯文本 fallback/提取）**\n' + 
       '- 每个回答至少包含 2 个引用，最多包含 6 个引用。\n' +
-      '- 引用格式：在句子末尾用 (fileName:line) 引用，如 "该函数接收两个参数 (gitnexus/src/core/search/hybrid-search.ts:175)"\n' +
-      '- 范围引用用 (fileName:start-end)，如 (schema.ts:4-9)\n' +
+      '- **引用必须使用上方 SEARCH CONTEXT 中列出的精确路径，禁止编造不存在的文件路径。**\n' +
+      (isCrossRepo
+        ? '- 引用格式：在句子末尾用 (repoName:relative/path/file.ts:line)，如 (gitnexus:src/server/proxy.ts:42)\n'
+        : '- 引用格式：在句子末尾用 (relative/path/file.ts:line)，如 "该函数接收两个参数 (gitnexus/src/core/search/hybrid-search.ts:175)"\n') +
+      '- 范围引用用 (path:start-end)，如 (schema.ts:4-9)\n' +
       '- **重要：每个括号内只放一个文件+一个范围，绝对禁止逗号分隔多个范围。** 错误示例：(file.ts:1,5,10) 或 (file.ts:1-3,5-8)。如果要引用多个范围，请分开成多个括号引用。\n' +
-      '- 引用文件路径使用相对路径，如 gitnexus/src/core/search/bm25-index.ts:60。**绝对禁止只写文件名**，错误示例：bm25-index.ts:60。引用必须紧贴句子末尾，不要插在句子中间。\n' + 
-      '> 引用不要用反引号包裹！错误示例：\`(file.ts:1)\`。正确：(file.ts:1)。\n\n';
+      (isCrossRepo
+        ? '- 引用文件路径使用 仓库名+相对路径 格式，如 gitnexus:src/server/bm25-index.ts:60。**绝对禁止只写文件名**\n'
+        : '- 引用文件路径使用相对路径，如 gitnexus/src/core/search/bm25-index.ts:60。**绝对禁止只写文件名**，错误示例：bm25-index.ts:60。引用必须紧贴句子末尾，不要插在句子中间。\n') + 
+      '> 引用不要用反引号包裹！错误示例：\`(file.ts:1)\`。正确：(file.ts:1)。\n\n' +
+      (isCrossRepo ?
+      '- **跨仓库模式：引用必须包含仓库名！** 格式为 (repoName:path/file.ts:line)，如 (gitnexus:src/server/proxy.ts:42)\n' +
+      '- 每个引用都必须标注来源仓库，绝对禁止省略 repoName。\n' +
+      '- 回答可以覆盖多个仓库，每个引用要准确标注来自哪个仓库。\n'
+      : '');
 
     if (ACP_ENABLED) {
       const repoName = entry?.name;
@@ -607,7 +806,7 @@ export function createQaEndpoint(
                 session.messages.push({ role: 'assistant', content });
                 session.updatedAt = new Date().toISOString();
                 const repoBase = entry ? path.dirname(entry.storagePath) : null;
-                const resolvedSources = await resolveAnswerSources(content, sources, repoBase);
+                const resolvedSources = await resolveAnswerSources(content, sources, repoBase, repoBaseMap);
                 const finalSources = resolvedSources.length > sources.length ? resolvedSources : sources;
                 session.sources = finalSources;
                 saveSession(session);
@@ -714,7 +913,7 @@ export function createQaEndpoint(
         session.messages.push({ role: 'assistant', content: assistantContent });
         session.updatedAt = new Date().toISOString();
         const repoBase = entry ? path.dirname(entry.storagePath) : null;
-        const resolvedSources = await resolveAnswerSources(assistantContent, sources, repoBase);
+        const resolvedSources = await resolveAnswerSources(assistantContent, sources, repoBase, repoBaseMap);
         const finalSources = resolvedSources.length > sources.length ? resolvedSources : sources;
         session.sources = finalSources;
         saveSession(session);

@@ -63,6 +63,7 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-seri
 .header-left{display:flex;align-items:center;gap:10px}
 .header-left h1{font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px}
 .header-repo-name{font-size:11px;color:var(--color-text-secondary);font-weight:500;padding:3px 8px;border-radius:4px;background:var(--bg-secondary)}
+.header-cross-badge{font-size:11px;color:var(--color-purple);font-weight:600;padding:3px 8px;border-radius:4px;background:var(--bg-secondary);border:1px solid var(--color-purple)}
 .header-right{display:flex;align-items:center;gap:10px}
 .btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:6px;font-size:13px;cursor:pointer;border:1px solid var(--color-border);background:transparent;color:var(--color-text-primary);transition:all .15s}
 .btn:hover{background:var(--bg-secondary)}
@@ -189,6 +190,7 @@ a.file-ref:hover{text-decoration:underline;border-bottom-style:solid}
       <div class="header-left">
         <h1>CodeWiki</h1>
         <span class="header-repo-name" id="headerRepoName"></span>
+        <span class="header-cross-badge" id="headerCrossBadge" style="display:none">Cross-repo</span>
       </div>
       <div class="header-right">
         <button class="btn" onclick="goToWiki()">Wiki</button>
@@ -203,8 +205,8 @@ a.file-ref:hover{text-decoration:underline;border-bottom-style:solid}
   <div id="messagesInner">
 
     <div class="empty-state" id="emptyState">
-      <h2>Ask about this codebase</h2>
-      <p>I can help you understand architecture, find code, or explain how things work.</p>
+      <h2 id="emptyTitle">Ask about this codebase</h2>
+      <p id="emptyDesc">I can help you understand architecture, find code, or explain how things work.</p>
       <div class="suggestions">
         <button onclick="askSuggestion('Explain the project architecture')">Project architecture</button>
         <button onclick="askSuggestion('What are the main modules?')">Main modules</button>
@@ -226,7 +228,7 @@ a.file-ref:hover{text-decoration:underline;border-bottom-style:solid}
 <div class="bottom-bar">
   <div class="input-box">
     <form id="qaForm" onsubmit="sendMessage(event)" style="display:flex;align-items:flex-end;gap:8px;width:100%">
-      <textarea id="qaInput" rows="1" placeholder="Ask anything about this codebase..." autocomplete="off" autofocus></textarea>
+      <textarea id="qaInput" rows="1" placeholder="Ask anything..." autocomplete="off" autofocus></textarea>
       <button type="submit" id="sendBtn">Ask</button>
     </form>
   </div>
@@ -285,7 +287,7 @@ function createSessionBlock(question) {
   block.className = 'session-block';
   block.id = blockId;
   block.innerHTML = `
-    <div class="breadcrumb"><a href="/codewiki/${encodeURIComponent(currentRepo || '')}">\u2190 Overview</a></div>
+    <div class="breadcrumb"><a href="${currentRepo ? '/codewiki/' + encodeURIComponent(currentRepo) : '/codewiki/'}">\u2190 ${currentRepo ? 'Overview' : 'All repos'}</a></div>
     <div class="question-title">
       <span class="question-text">${escapeHtml(question)}</span>
       <span class="fast-badge">Fast</span>
@@ -438,51 +440,88 @@ function navigateToSource(blockId, refId) {
 
 function processFileRefs(rootEl, blockId) {
   const sources = _sourceMap[blockId];
-  if (!sources || sources.length === 0) return;
+  if (!sources || sources.length === 0) { console.log('[qa] pf no sources', { blockId, mapKeys: Object.keys(_sourceMap) }); return; }
 
-  const nameToRef = {};
-  const lineToRef = {};
+  const pathLookup = {};
+  const nameLookup = {};
   for (const src of sources) {
-    nameToRef[src.fileName] = src.refId ?? src.fileName;
-    lineToRef[src.fileName + ':' + src.startLine] = src.refId ?? src.fileName;
-    if (src.filePath && src.filePath !== src.fileName) {
-      nameToRef[src.filePath] = src.refId ?? src.filePath;
-      lineToRef[src.filePath + ':' + src.startLine] = src.refId ?? src.filePath;
+    const id = src.refId ?? 0;
+    var addKey = function(map, key) { if (key) map[key] = id; };
+    if (src.filePath) {
+      addKey(pathLookup, src.filePath + ':' + src.startLine);
+      if (src.endLine && src.endLine !== src.startLine) {
+        addKey(pathLookup, src.filePath + ':' + src.startLine + '-' + src.endLine);
+      }
     }
-  }
-
-  const patterns = Object.keys(nameToRef);
-  if (patterns.length === 0) return;
-  patterns.sort(function(a, b) { return b.length - a.length; });
-  var escaped = patterns.map(function(fn) {
-    return fn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  });
-  var pattern = new RegExp('\\b(' + escaped.join('|') + '):(\\d+)(?:-(\\d+))?\\b', 'g');
-
-  var walker = document.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT, null);
-
-  var toReplace = [];
-  while (walker.nextNode()) {
-    var txt = walker.currentNode.textContent;
-    for (var fi = 0; fi < patterns.length; fi++) {
-      if (txt.indexOf(patterns[fi] + ':') !== -1) {
-        toReplace.push(walker.currentNode);
-        break;
+    if (src.fileName) {
+      addKey(nameLookup, src.fileName + ':' + src.startLine);
+      if (src.endLine && src.endLine !== src.startLine) {
+        addKey(nameLookup, src.fileName + ':' + src.startLine + '-' + src.endLine);
       }
     }
   }
+  console.log('[qa] pf lookup keys', { pathKeys: Object.keys(pathLookup).length, nameKeys: Object.keys(nameLookup).length, samplePath: Object.keys(pathLookup)[0] });
 
-  for (const textNode of toReplace) {
-    const html = textNode.textContent.replace(pattern, function(match, fileName, line, endLine) {
-      var refId = lineToRef[fileName + ':' + line] ?? nameToRef[fileName];
-      var displayName = fileName.split('/').pop() || fileName;
+  var FILE_REF_RE = /(?:([\w-]+):)?([\w./-]+\.[a-zA-Z][\w.-]*):(\d+)(?:-(\d+))?/g;
+
+  var walker = document.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT, null);
+  var textNodes = [];
+  while (walker.nextNode()) {
+    textNodes.push(walker.currentNode);
+  }
+  console.log('[qa] pf text node count', textNodes.length);
+
+  var matchCount = 0;
+  for (const textNode of textNodes) {
+    var sample = textNode.textContent.slice(0, 200);
+    var matches = [];
+    var m;
+    FILE_REF_RE.lastIndex = 0;
+    while ((m = FILE_REF_RE.exec(textNode.textContent)) !== null) {
+      matches.push(m[0]);
+    }
+    if (matches.length > 0) console.log('[qa] pf regex matches in text', { sample: sample, matches: matches.slice(0, 3) });
+
+    const html = textNode.textContent.replace(FILE_REF_RE, function(match, repoName, filePath, line, endLine) {
+      var lineSuffix = endLine ? line + '-' + endLine : line;
+      var refId = null;
+
+      if (repoName) {
+        refId = pathLookup[repoName + ':' + filePath + ':' + lineSuffix];
+        if (refId == null) {
+          var fileName = filePath.split('/').pop();
+          refId = nameLookup[repoName + ':' + fileName + ':' + lineSuffix];
+        }
+      }
+
+      if (refId == null) {
+        refId = pathLookup[filePath + ':' + lineSuffix];
+      }
+      if (refId == null) {
+        var fileName = filePath.split('/').pop();
+        refId = nameLookup[fileName + ':' + lineSuffix];
+      }
+
+      if (refId == null) {
+        console.log('[qa] pf no refId', { match: match, repoName: repoName, filePath: filePath, line: line });
+        return match;
+      }
+
+      matchCount++;
+      var displayBase = filePath;
+      var displayPrefix = '';
+      if (repoName) {
+        displayPrefix = repoName + ':';
+      }
+      var displayName = displayPrefix + (displayBase.split('/').pop() || displayBase);
       var displayText = displayName + ':' + line + (endLine ? '-' + endLine : '');
       return '<a class="file-ref" href="javascript:void(0)" onclick="return navigateToSource(\'' + blockId + '\', ' + refId + ')" data-source-id="' + displayName + '">' + displayText + '</a>';
     });
-    const span = document.createElement('span');
+    var span = document.createElement('span');
     span.innerHTML = html;
     textNode.parentNode.replaceChild(span, textNode);
   }
+  console.log('[qa] pf matchCount', matchCount);
 }
 
 function updateAnswerContent(blockId, content) {
@@ -493,10 +532,12 @@ function updateAnswerContent(blockId, content) {
   if (typingIndicator) typingIndicator.remove();
 
   answerEl.innerHTML = marked.parse(content);
-  processFileRefs(answerEl, blockId);
-  answerEl.querySelectorAll('pre code').forEach((block) => {
-    hljs.highlightElement(block);
-  });
+  try { processFileRefs(answerEl, blockId); } catch(e) { console.error('[qa] processFileRefs error', e); }
+  try {
+    answerEl.querySelectorAll('pre code').forEach((block) => {
+      hljs.highlightElement(block);
+    });
+  } catch(e) { console.error('[qa] highlight error', e); }
   // Convert mermaid code blocks into rendered diagrams
   answerEl.querySelectorAll('pre code.language-mermaid').forEach(function(block) {
     var pre = block.parentElement;
@@ -505,7 +546,7 @@ function updateAnswerContent(blockId, content) {
     div.textContent = block.textContent;
     pre.parentElement.replaceChild(div, pre);
   });
-  try { mermaid.run({ querySelector: '.answer-content .mermaid' }); } catch(e) {}
+  try { mermaid.run({ querySelector: '.answer-content .mermaid' }); } catch(e) { console.error('[qa] mermaid error', e); }
 }
 
 function updateSendBtn() {
@@ -587,7 +628,9 @@ async function sendMessage(e) {
             currentSessionId = data.id;
             const sessionUrl = '/codewiki/qa/' + currentSessionId;
             history.replaceState(null, '', sessionUrl);
+            console.log('[qa] session', data.id);
           } else if (data.type === 'sources') {
+            console.log('[qa] sources event', { count: data.sources?.length, first: data.sources?.[0]?.filePath, currentRepo: currentRepo });
             if (currentBlockId) {
               populateFileList(currentBlockId, data.sources);
               processFileRefs(document.getElementById('answer-' + currentBlockId), currentBlockId);
@@ -699,7 +742,9 @@ mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose
 const pathRepoMatch = location.pathname.match(/^\/codewiki\/(?!qa\b)([^/]+)\/qa/);
 let currentRepo = pathRepoMatch?.[1] || new URLSearchParams(location.search).get('repo') || undefined;
 const headerRepoName = document.getElementById('headerRepoName');
-if (currentRepo) { headerRepoName.textContent = currentRepo; document.title = currentRepo + ' — CodeWiki Q&A'; }
+const headerCrossBadge = document.getElementById('headerCrossBadge');
+if (currentRepo) { headerRepoName.textContent = currentRepo; document.title = currentRepo + ' — CodeWiki Q&A'; document.getElementById('qaInput').placeholder = 'Ask about ' + currentRepo + '...'; }
+else { headerCrossBadge.style.display = 'inline'; document.title = 'CodeWiki Q&A (Cross-repo)'; document.getElementById('emptyTitle').textContent = 'Ask across all repositories'; document.getElementById('emptyDesc').textContent = 'I can search across all indexed codebases to find answers.'; }
 
 const sessionMatch = location.pathname.match(/^\/codewiki\/qa\/([^/]+)/);
 const currentSessionIdFromUrl = sessionMatch?.[1] || null;
@@ -711,7 +756,7 @@ async function restoreSession(sessionId) {
     if (!resp.ok) return;
     const session = await resp.json();
     if (!session.messages || session.messages.length === 0) return;
-    if (session.repo) { currentRepo = session.repo; headerRepoName.textContent = session.repo; }
+    if (session.repo) { currentRepo = session.repo; headerRepoName.textContent = session.repo; headerRepoName.style.display = ''; headerCrossBadge.style.display = 'none'; document.getElementById('qaInput').placeholder = 'Ask about ' + session.repo + '...'; document.title = session.repo + ' — CodeWiki Q&A'; }
     let lastBlockId = null;
     for (let i = 0; i < session.messages.length; i += 2) {
       const userMsg = session.messages[i];
