@@ -12,12 +12,20 @@ node node_modules/@ladybugdb/core/install.js
 
 # ====== 日常开发 ======
 cd gitnexus
+node scripts/build.js
 
 # 方式 A：用 dist 测试（推荐，不受 tsx 兼容性影响）
-node scripts/build.js
-LD_LIBRARY_PATH=`pwd`/../codewiki/lib/ node dist/cli/index.js analyze /some/repo
-LD_LIBRARY_PATH=`pwd`/../codewiki/lib/ node dist/cli/index.js wiki --lang chinese /some/repo
+CODEWIKI_ACP_ENABLE=true LD_LIBRARY_PATH=`pwd`/../codewiki/lib/ node dist/cli/index.js analyze /some/repo
+CODEWIKI_ACP_ENABLE=true LD_LIBRARY_PATH=`pwd`/../codewiki/lib/ node dist/cli/index.js wiki --lang chinese /some/repo
+
+# LLM mode
 LD_LIBRARY_PATH=`pwd`/../codewiki/lib/ npm run serve
+
+# ACP mode
+CODEWIKI_ACP_ENABLE=true LD_LIBRARY_PATH=`pwd`/../codewiki/lib/ npm run serve
+
+# ACP cross-repo mode
+CODEWIKI_ACP_CROSS_ROOT=true CODEWIKI_ACP_ENABLE=true LD_LIBRARY_PATH=`pwd`/../codewiki/lib/ npm run serve
 
 
 # 方式 B：用 tsx 开发（改源码 + 改 shared 后不用 build）
