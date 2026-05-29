@@ -195,7 +195,7 @@ async function acpPrompt(
       res.write('data: ' + JSON.stringify({ type: 'reasoning', content: text }) + '\n\n');
     },
     onToolCall: (toolCallId, title, kind, status) => {
-      log('info', 'ACP tool_call', { sessionId, toolCallId, title, kind, status });
+      log('info', 'ACP', { sessionId, title, kind, status });
     },
     onToolCallUpdate: (toolCallId, status, content, title, kind) => {
       if (content) {
