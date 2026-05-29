@@ -139,6 +139,8 @@ function log(level: 'info' | 'warn' | 'error' | 'debug', msg: string, data?: Rec
 }
 
 const ACP_ENABLED = process.env.CODEWIKI_ACP_ENABLE === 'true';
+const ACP_CROSS_ROOT = process.env.CODEWIKI_ACP_CROSS_ROOT === 'true';
+const CROSS_REPO_ACP_CLIENT = '__cross__';
 
 const repoClients = new Map<string, AcpClient>();
 const repoActiveSessions = new Map<string, Set<string>>();
@@ -766,16 +768,30 @@ export function createQaEndpoint(
       : '');
 
     if (ACP_ENABLED) {
-      // Cross-repo: use the first repo with search results as ACP host
-      let acpRepoName = entry?.name ??
-        (isCrossRepo && repoBaseMap && repoBaseMap.size > 0 ? [...repoBaseMap.keys()][0] : undefined);
+      let acpRepoName: string | undefined;
+      let acpRepoBase: string | undefined;
+
+      if (isCrossRepo && repoBaseMap && repoBaseMap.size > 0) {
+        if (ACP_CROSS_ROOT) {
+          acpRepoName = CROSS_REPO_ACP_CLIENT;
+          const firstBase = [...repoBaseMap.values()][0];
+          acpRepoBase = path.dirname(path.dirname(firstBase));
+          log('info', 'ACP cross-repo using parent dir', { name: acpRepoName, base: acpRepoBase });
+        } else {
+          acpRepoName = [...repoBaseMap.keys()][0];
+          acpRepoBase = repoBaseMap.get(acpRepoName);
+        }
+      } else {
+        acpRepoName = entry?.name;
+        acpRepoBase = entry ? path.dirname(entry.storagePath) : undefined;
+      }
+
       let acpSessionId = session.acpSessionId;
 
       if (acpRepoName) {
         let client = repoClients.get(acpRepoName);
         if (!client) {
-          const repoBase = repoBaseMap?.get(acpRepoName) ?? (entry ? path.dirname(entry.storagePath) : '.');
-          client = await initRepoClient(acpRepoName, repoBase);
+          client = await initRepoClient(acpRepoName, acpRepoBase ?? '.');
         }
 
         if (client) {
@@ -807,7 +823,7 @@ export function createQaEndpoint(
               if (content && !aborted) {
                 session.messages.push({ role: 'assistant', content });
                 session.updatedAt = new Date().toISOString();
-                const repoBase = acpEntry ? path.dirname(acpEntry.storagePath) : null;
+                const repoBase = entry ? path.dirname(entry.storagePath) : null;
                 const resolvedSources = await resolveAnswerSources(content, sources, repoBase, repoBaseMap);
                 const finalSources = resolvedSources.length > sources.length ? resolvedSources : sources;
                 session.sources = finalSources;
