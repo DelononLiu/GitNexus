@@ -766,19 +766,21 @@ export function createQaEndpoint(
       : '');
 
     if (ACP_ENABLED) {
-      const repoName = entry?.name;
+      // Cross-repo: use the first repo with search results as ACP host
+      let acpRepoName = entry?.name ??
+        (isCrossRepo && repoBaseMap && repoBaseMap.size > 0 ? [...repoBaseMap.keys()][0] : undefined);
       let acpSessionId = session.acpSessionId;
 
-      if (repoName) {
-        let client = repoClients.get(repoName);
+      if (acpRepoName) {
+        let client = repoClients.get(acpRepoName);
         if (!client) {
-          const repoBase = path.dirname(entry!.storagePath);
-          client = await initRepoClient(repoName, repoBase);
+          const repoBase = repoBaseMap?.get(acpRepoName) ?? (entry ? path.dirname(entry.storagePath) : '.');
+          client = await initRepoClient(acpRepoName, repoBase);
         }
 
         if (client) {
           // Max session check
-          const activeSessions = repoActiveSessions.get(repoName);
+          const activeSessions = repoActiveSessions.get(acpRepoName);
           if (activeSessions && activeSessions.size >= MAX_SESSIONS_PER_REPO) {
             res.write('data: ' + JSON.stringify({ type: 'error', message: 'Too many active sessions, please try again later' }) + '\n\n');
             res.end();
@@ -805,7 +807,7 @@ export function createQaEndpoint(
               if (content && !aborted) {
                 session.messages.push({ role: 'assistant', content });
                 session.updatedAt = new Date().toISOString();
-                const repoBase = entry ? path.dirname(entry.storagePath) : null;
+                const repoBase = acpEntry ? path.dirname(acpEntry.storagePath) : null;
                 const resolvedSources = await resolveAnswerSources(content, sources, repoBase, repoBaseMap);
                 const finalSources = resolvedSources.length > sources.length ? resolvedSources : sources;
                 session.sources = finalSources;
