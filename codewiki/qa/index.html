@@ -262,12 +262,13 @@ function scrollToBottom() {
 
 function scrollToElement(el) {
   if (!el) return;
-  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  el.scrollIntoView({ behavior: 'auto', block: 'start' });
 }
 
 let blockCounter = 0;
 let currentBlockId = null;
 let currentSessionId = null;
+let _globalRefCounter = 0;
 const _sourceMap = {};
 
 function createSessionBlock(question) {
@@ -348,12 +349,13 @@ function populateFileList(blockId, sources) {
   const empty = document.getElementById('fileListEmpty');
   if (!container) return;
 
-  if (!sources || sources.length === 0) {
-    container.innerHTML = '';
-    if (empty) empty.style.display = '';
-    return;
-  }
+  if (!sources || sources.length === 0) return;
   if (empty) empty.style.display = 'none';
+
+  // Assign globally unique ref IDs
+  for (const src of sources) {
+    src.refId = _globalRefCounter++;
+  }
 
   // Filter snippet to only show lines within startLine-endLine range
   function filterSnippetLines(snippet, startLine, endLine) {
@@ -374,6 +376,13 @@ function populateFileList(blockId, sources) {
     return filtered.join('\n');
   }
 
+  // Add block separator between question rounds (first round has no separator)
+  if (container.children.length > 0) {
+    const sep = document.createElement('div');
+    sep.className = 'block-separator';
+    container.appendChild(sep);
+  }
+
   let html = '';
   for (let i = 0; i < sources.length; i++) {
     const src = sources[i];
@@ -383,7 +392,7 @@ function populateFileList(blockId, sources) {
     const fid = blockId + '-f' + i;
     const sid = blockId + '-s' + i;
     const filteredSnippet = filterSnippetLines(src.snippet, src.startLine, src.endLine);
-    html += '<div class="file-list-item expanded" id="' + fid + '" data-source-id="' + (src.refId ?? i) + '">';
+    html += '<div class="file-list-item expanded" id="' + fid + '" data-source-id="' + src.refId + '">';
     html += '<div class="file-item-header" onclick="toggleFile(\'' + fid + '\')">';
     html += '<span class="expand-icon">\u25b6</span>';
     html += '<span class="file-item-name">' + escapeHtml(src.fileName) + '</span>';
@@ -395,7 +404,11 @@ function populateFileList(blockId, sources) {
     html += '</div>';
     html += '</div>';
   }
-  container.innerHTML = html;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  while (tmp.firstChild) {
+    container.appendChild(tmp.firstChild);
+  }
 }
 
 function toggleFile(itemId) {
