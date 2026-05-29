@@ -181,6 +181,7 @@ async function acpPrompt(
   systemPrompt: string,
   isFirstTurn: boolean,
   res: ServerResponse,
+  sessionId: string,
 ): Promise<string> {
   const prompt = buildPrompt(question, systemPrompt, isFirstTurn);
   let content = '';
@@ -194,7 +195,7 @@ async function acpPrompt(
       res.write('data: ' + JSON.stringify({ type: 'reasoning', content: text }) + '\n\n');
     },
     onToolCall: (toolCallId, title, kind, status) => {
-      log('info', 'ACP tool_call', { toolCallId, title, kind, status });
+      log('info', 'ACP tool_call', { sessionId, toolCallId, title, kind, status });
     },
     onToolCallUpdate: (toolCallId, status, content, title, kind) => {
       if (content) {
@@ -819,7 +820,7 @@ export function createQaEndpoint(
 
             try {
               const isFirstTurn = session.messages.length <= 1;
-              const content = await acpPrompt(client, acpSessionId, question, systemPrompt, isFirstTurn, res);
+              const content = await acpPrompt(client, acpSessionId, question, systemPrompt, isFirstTurn, res, sessionId);
               if (content && !aborted) {
                 session.messages.push({ role: 'assistant', content });
                 session.updatedAt = new Date().toISOString();
