@@ -262,7 +262,8 @@ function scrollToBottom() {
 
 function scrollToElement(el) {
   if (!el) return;
-  el.scrollIntoView({ behavior: 'auto', block: 'start' });
+  var top = window.scrollY + el.getBoundingClientRect().top - 70;
+  window.scrollTo({ top: top, behavior: 'smooth' });
 }
 
 let blockCounter = 0;
@@ -687,7 +688,12 @@ function clearChat() {
   currentBlockId = null;
   currentSessionId = null;
   blockCounter = 0;
+  _globalRefCounter = 0;
   messagesInner.querySelectorAll('.session-block, .block-separator, .qa-error').forEach(function(el) { el.remove(); });
+  var filesEl = document.getElementById('filesGlobal');
+  if (filesEl) filesEl.innerHTML = '';
+  var emptyEl = document.getElementById('fileListEmpty');
+  if (emptyEl) emptyEl.style.display = '';
   emptyState.style.display = '';
   input.value = '';
   input.style.height = 'auto';
