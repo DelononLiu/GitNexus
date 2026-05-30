@@ -397,7 +397,7 @@ body{background:#f5f5f7;color:#111}
   <div class="input-box">
     <form action="/qa" method="get" style="display:flex;align-items:flex-end;gap:8px;width:100%">
       <input type="hidden" name="repo" value="${repoName}">
-      <textarea name="q" placeholder="${repoName} 相关问题..." autocomplete="off"></textarea>
+      <textarea name="q" placeholder="${repoName} 相关问题..." autocomplete="off" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.form.submit()}"></textarea>
       <button type="submit">Ask</button>
     </form>
   </div>

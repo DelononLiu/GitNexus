@@ -43,6 +43,7 @@ node engine/codegraph/dist/bin/codegraph.js index ~/Code/example
 
 # 6. 启动服务
 npm run dev
+# OPENCODEWIKI_ACP_ENABLE=true npm run dev
 # OpenCodeWiki server running on http://localhost:4747
 ```
 
