@@ -382,7 +382,7 @@ body{background:#f5f5f7;color:#111}
 </style></head>
 <body>
 <div class="header">
-  <h1 style="color:#007aff;display:inline">OpenCodeWiki</h1> <span style="font-size:13px;color:#888">/ 你的代码智能问答助手</span>
+  <h1 style="color:#007aff;display:inline"><a href="/" style="color:inherit;text-decoration:none">OpenCodeWiki</a></h1>
   <span style="font-size:13px;color:#888">${repoName}</span>
 </div>
 <div class="main">
