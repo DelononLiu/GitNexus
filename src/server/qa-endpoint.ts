@@ -132,6 +132,55 @@ export function getSession(id: string): QaSession | undefined {
   return sessions.get(id);
 }
 
+export interface QaSessionSummary {
+  id: string;
+  summary: string;
+  messageCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function listSessions(sort: 'latest' | 'popular' = 'latest', limit = 10): QaSessionSummary[] {
+  const list = Array.from(sessions.values());
+  if (sort === 'popular') {
+    list.sort((a, b) => b.messages.length - a.messages.length);
+  } else {
+    list.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  }
+  return list.slice(0, limit).map(s => ({
+    id: s.id,
+    summary: s.messages.find(m => m.role === 'user')?.content?.slice(0, 80) || '(empty)',
+    messageCount: s.messages.length,
+    createdAt: s.createdAt,
+    updatedAt: s.updatedAt,
+  }));
+}
+
+export interface FrequentQuestion {
+  question: string;
+  count: number;
+  lastAsked: string;
+}
+
+export function listFrequentQuestions(limit = 3): FrequentQuestion[] {
+  const freq = new Map<string, { count: number; lastAsked: string }>();
+  for (const session of sessions.values()) {
+    const q = session.messages.find(m => m.role === 'user')?.content?.trim();
+    if (!q) continue;
+    const existing = freq.get(q);
+    if (existing) {
+      existing.count++;
+      if (session.updatedAt > existing.lastAsked) existing.lastAsked = session.updatedAt;
+    } else {
+      freq.set(q, { count: 1, lastAsked: session.updatedAt });
+    }
+  }
+  return Array.from(freq.entries())
+    .map(([question, data]) => ({ question, count: data.count, lastAsked: data.lastAsked }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit);
+}
+
 function log(level: 'info' | 'warn' | 'error' | 'debug', msg: string, data?: Record<string, unknown>) {
   const ts = new Date().toISOString();
   const line = data ? msg + ' ' + JSON.stringify(data) : msg;

@@ -163,11 +163,34 @@
 
 Phase 2 预留给 Phase 1 迁移后的稳定性测试、问题修复、性能优化、以及日常使用中暴露的兼容性问题修复。
 
-此阶段不引入新功能，只打磨。
-
 | 任务 | 说明 | 状态 |
 |------|------|------|
 | P2-01 | 稳定性测试 + 问题修复 | ⬜ 未开始 |
+| P2-02 | 增加 QA 历史记录（主页侧边栏最新问答） | ✅ 已完成 |
+
+### P2-02: 增加 QA 历史记录
+
+**涉及文件**:
+- `src/server/qa-endpoint.ts:27-33` — `getDataDir()` 和 `sessionFilePath()` 确定存储路径
+- `src/server/qa-endpoint.ts:55-63` — `saveSession()` 写入磁盘
+- `src/server/qa-endpoint.ts:65-89` — `loadSessions()` 启动时从磁盘恢复
+- `src/server/qa-endpoint.ts:91-113` — `cleanupStaleSessions()` TTL 清理
+- `src/server/qa-endpoint.ts:135-157` — `listSessions()` / `listFrequentQuestions()` 新导出
+- `src/server/codegraph-bridge.ts:321-327` — session REST API 路由
+- `src/server/codegraph-bridge.ts:330-337` — `GET /api/qa/sessions/latest` + `/frequent`
+- `src/home/index.html` — 主页重构：侧边栏最新 QA 列表 + 输入框 + 示例按钮 + repo 网格
+
+**调研结果**:
+- 后端 session 已内存 + 磁盘双持久化，但只有 `GET /api/qa/session/:id` 单条查询 API
+- 前端 `restoreSession` 仅能从 URL `/qa/<id>` 恢复，无 session 历史列表
+
+**实现概要**:
+- 后端新增 `listSessions()` / `listFrequentQuestions()` 导出函数 + 2 条 REST 路由
+- 主页重构为 home-layout（主内容区 + 侧边栏）
+- 侧边栏展示最新 10 条 QA，点击跳转到 `/qa/<id>` 查看完整对话
+- 输入框区域精简：去掉标题/状态指示/search 框，保留大型输入框 + 示例按钮 + repo 网格
+
+**状态**: ✅ 已完成
 
 ---
 

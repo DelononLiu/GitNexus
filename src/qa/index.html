@@ -161,14 +161,17 @@ a.file-ref:hover{text-decoration:underline;border-bottom-style:solid}
 .typing-indicator span:nth-child(3){animation-delay:.4s}
 @keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-7px)}}
 
-.bottom-bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:100%;max-width:600px;z-index:20;padding:0 16px}
-.input-box{background:var(--bg-component);border:1px solid var(--color-border);border-radius:10px;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding:8px 12px;display:flex;align-items:flex-end;gap:8px;box-shadow:0 4px 24px rgba(0,0,0,.06);transition:border-color .15s}
+.bottom-bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:100%;max-width:640px;z-index:20;padding:0 16px}
+.input-box{background:var(--bg-component);border:1px solid var(--color-border);border-radius:14px;padding:10px 16px;display:flex;align-items:flex-end;gap:8px;box-shadow:0 2px 8px rgba(0,0,0,.04);transition:border-color .15s}
 .input-box:focus-within{border-color:var(--color-blue);box-shadow:0 0 0 3px var(--color-input-glow)}
-.input-box textarea{flex:1;border:none;background:transparent;outline:none;font-size:14px;font-family:inherit;color:var(--color-text-primary);resize:none;padding:8px 0;line-height:1.6;max-height:150px;min-height:48px}
+.input-box textarea{flex:1;border:none;background:transparent;outline:none;font-size:16px;font-family:inherit;color:var(--color-text-primary);resize:none;overflow:hidden;padding:3px 0;line-height:1.6;min-height:56px;font-family:inherit}
 .input-box textarea::placeholder{color:var(--color-text-secondary)}
-.input-box button{padding:8px 20px;background:var(--color-blue);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;transition:opacity .15s;white-space:nowrap;flex-shrink:0}
+.input-box button{padding:8px 22px;background:var(--color-blue);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;transition:opacity .15s;white-space:nowrap;flex-shrink:0}
 .input-box button:hover{opacity:.88}
 .input-box button:disabled{opacity:.35;cursor:not-allowed}
+.input-box textarea::-webkit-scrollbar{width:4px}
+.input-box textarea::-webkit-scrollbar-thumb{background:var(--color-text-secondary);border-radius:2px}
+.input-box textarea::-webkit-scrollbar-button{display:none}
 
 .qa-error{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;font-size:13px;color:#991b1b;display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0}
 .qa-error button{background:none;border:none;color:var(--color-blue);cursor:pointer;font-size:13px;padding:0;text-decoration:underline;white-space:nowrap}
@@ -599,7 +602,9 @@ function setLoading(loading) {
 
 function autoResize() {
   input.style.height = 'auto';
-  input.style.height = Math.min(input.scrollHeight, 90) + 'px';
+  var sh = input.scrollHeight;
+  input.style.height = Math.min(sh, 120) + 'px';
+  input.style.overflowY = sh > 120 ? 'auto' : 'hidden';
 }
 
 async function sendMessage(e) {

@@ -7,7 +7,7 @@ import os from 'os';
 import { fileURLToPath } from 'url';
 import { ToolHandler } from '@colbymchenry/codegraph/dist/mcp/index.js';
 import { CodeGraph } from '@colbymchenry/codegraph';
-import { createQaEndpoint, getSession } from './qa-endpoint.js';
+import { createQaEndpoint, getSession, listSessions, listFrequentQuestions } from './qa-endpoint.js';
 
 const opencodewikiDir = path.join(os.homedir(), '.opencodewiki');
 const registryFile = path.join(opencodewikiDir, 'registry.json');
@@ -327,6 +327,14 @@ app.get('/api/qa/session/:id', (req, res) => {
   });
 });
 
+app.get('/api/qa/sessions/latest', (_req, res) => {
+  res.json(listSessions('latest', 10));
+});
+
+app.get('/api/qa/sessions/frequent', (_req, res) => {
+  res.json(listFrequentQuestions(3));
+});
+
 const knownRepos = async () => {
   const reg = await loadRegistry();
   const names = reg.map(r => r.name);
@@ -358,10 +366,13 @@ body{background:#f5f5f7;color:#111;min-height:100vh}
 .stat-box{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px 20px;flex:1;text-align:center}
 .stat-box .num{font-size:24px;font-weight:700;color:#007aff}
 .stat-box .label{font-size:12px;color:#888;margin-top:4px}
-.qa-box{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:16px}
-.qa-box textarea{width:100%;border:none;outline:none;font-size:15px;resize:none;padding:8px 0;min-height:60px;line-height:1.6;font-family:inherit}
-.qa-box button{padding:10px 24px;background:#007aff;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;float:right}
+.qa-box{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:10px 16px}
+.qa-box textarea{width:100%;border:none;outline:none;font-size:16px;resize:none;overflow:hidden;padding:3px 0;min-height:56px;line-height:1.6;font-family:inherit}
+.qa-box button{padding:8px 22px;background:#007aff;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;float:right}
 .qa-box button:hover{opacity:.88}
+.qa-box textarea::-webkit-scrollbar{width:4px}
+.qa-box textarea::-webkit-scrollbar-thumb{background:#bbb;border-radius:2px}
+.qa-box textarea::-webkit-scrollbar-button{display:none}
 .repo-list{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px}
 .repo-list a{padding:6px 14px;border-radius:20px;border:1px solid #e5e7eb;text-decoration:none;font-size:13px;color:#555;background:#fff}
 .repo-list a.active{background:#007aff;color:#fff;border-color:#007aff}
