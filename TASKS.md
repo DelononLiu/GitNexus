@@ -64,28 +64,28 @@
 
 | 任务 | 说明 | 状态 | 优先级 |
 |------|------|------|--------|
-| P1-01 | 完成 codegraph-bridge Express 路由（目前 4/9 路由） | 📋 已调研 | P0 |
+| P1-01 | 完成 codegraph-bridge Express 路由 + 静态服务 + QA 集成（全功能） | ✅ 已完成 | P0 |
 | P1-02 | search 回调从 gitnexus 改为 codegraph API | 📋 已调研 | P0 |
 | P1-03 | 更新 systemPrompt 中工具名和引用格式 | 📋 已调研 | P0 |
 | P1-04 | ACP Agent 模式 MCP 工具注册切换为 codegraph | ⬜ 未开始 | P1 |
 | P1-05 | 跨仓库搜索验证（`listRepos` 回调对接） | ⬜ 未开始 | P1 |
 
-### P1-01: 补全 codegraph-bridge Express 路由
+### P1-01: 补全 codegraph-bridge Express 路由 + 静态服务 + QA 集成
 
 **涉及文件**:
-- `src/server/codegraph-bridge.ts` — 当前只注册了 search/context/impact/status 4 条，缺 files/callers/callees/node/explore
+- `src/server/codegraph-bridge.ts` — 全功能重写，含 9 路由 + 静态服务 + QA 端点集成
 
-**调研步骤**:
-1. 读 `PROJECT.md` → API 章节确认路由清单
-2. 打开 `codegraph-bridge.ts` 查看现有路由
+**改动内容**:
+- 修复 `ToolHandler` 导入路径为 `@colbymchenry/codegraph/dist/mcp/index.js`
+- 添加 `CodeGraph.init()` 懒初始化，自动创建 `.codegraph/` 目录
+- 添加静态文件服务：`/vendor/*` → vendor 目录（JS/CSS）
+- 添加前端页面路由：`/opencodewiki/` → landing，`/opencodewiki/qa` → QA
+- 集成 `createQaEndpoint` 注册 `POST /api/qa`（SSE 流式问答）
+- 添加 `GET /api/qa/session/:id` 会话查询
+- 实现 `search` 回调调用 codegraph 搜索
+- 将 `src/acp/` 移至 `src/server/acp/` 修复模块路径
 
-**调研结果**:
-- 当前 4 路由：`search`、`context`、`impact`、`status`
-- 缺少 5 路由：`files`、`callers`、`callees`、`node`、`explore`
-- `ToolHandler` 是 codegraph 导出类，`execute(toolName, body)` 一一对应 MCP 工具
-- 新增路由样式固定：`app.post('/api/files', async (req, res) => { ... })`
-
-**状态**: 📋 已调研
+**状态**: ✅ 已完成
 
 ### P1-02: search 回调从 gitnexus 改为 codegraph API
 
