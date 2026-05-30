@@ -810,12 +810,17 @@ async function restoreSession(sessionId) {
   } catch {}
 }
 
+// Redirect bare /qa (no question, no session) to home
+const qParams = new URLSearchParams(location.search);
+if (!qParams.get('q') && !qParams.get('repo') && !currentSessionIdFromUrl) {
+  location.href = '/';
+}
+
 if (currentSessionIdFromUrl) {
   restoreSession(currentSessionIdFromUrl);
 }
 
-const params = new URLSearchParams(location.search);
-const initialQ = params.get('q');
+const initialQ = qParams.get('q');
 if (initialQ && !currentSessionIdFromUrl) {
   input.value = initialQ;
   updateSendBtn();
