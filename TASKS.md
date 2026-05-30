@@ -67,8 +67,8 @@
 | P1-01 | 完成 codegraph-bridge Express 路由 + 静态服务 + QA 集成（全功能） | ✅ 已完成 | P0 |
 | P1-02 | search 回调从 gitnexus 改为 codegraph API | ✅ 已完成 | P0 |
 | P1-03 | 更新 systemPrompt 中工具名和引用格式 | ✅ 已完成 | P0 |
-| P1-04 | ACP Agent 模式 MCP 工具注册切换为 codegraph | ⬜ 未开始 | P1 |
-| P1-05 | 跨仓库搜索验证（`listRepos` 回调对接） | ⬜ 未开始 | P1 |
+| P1-04 | ACP Agent 模式 MCP 工具注册切换为 codegraph | ✅ 已完成 | P1 |
+| P1-05 | 跨仓库搜索验证（`listRepos` 回调对接） | ✅ 已完成 | P1 |
 
 ### P1-01: 补全 codegraph-bridge Express 路由 + 静态服务 + QA 集成
 
@@ -123,6 +123,37 @@
 
 **实现概要**:
 - `qa-endpoint.ts:753` systemPrompt 中搜索链路替换为 `codegraph_search → codegraph_context → codegraph_impact → grep`
+
+**状态**: ✅ 已完成
+
+### P1-04: ACP Agent 模式 MCP 工具注册切换为 codegraph
+
+**涉及文件**:
+- `src/server/acp/AcpClient.ts:80` — `createSession()` 的 `mcpServers` 从空数组改为注册 `codegraph serve --mcp` 作为 stdio MCP 服务器
+- `package.json` — 添加 `@agentclientprotocol/sdk` 依赖
+
+**调研结果**:
+- codegraph 提供 `npx codegraph serve --mcp` 以 stdio 模式运行 MCP 服务器
+- ACP `McpServerStdio` 类型支持直接配置命令和参数
+- `AcpClient.ts:80` 之前 `mcpServers: []` 未注册任何 MCP 工具，ACP Agent 无法调用 codegraph
+
+**实现概要**:
+- `AcpClient.ts:80` 中 `mcpServers` 添加 codegraph 条目：`command: 'npx'`, `args: ['codegraph', 'serve', '--mcp', '--no-watch', '--path', cwd]`
+
+**状态**: ✅ 已完成
+
+### P1-05: 跨仓库搜索验证（`listRepos` 回调对接）
+
+**涉及文件**:
+- `src/server/codegraph-bridge.ts:270-280` — `listRepos` 回调已从 registry 读取仓库列表
+- `src/server/codegraph-bridge.ts:237-260` — `search` 回调通过 `searchRepoPath` 支持 `projectPath` 过滤
+- `src/server/codegraph-bridge.ts:262-268` — `resolveRepo` 返回 `{ storagePath, name }`
+- `src/server/qa-endpoint.ts:602-670` — 跨仓库搜索循环，对每个 repo 并行调 search
+
+**调研结果**:
+- `listRepos` 返回 `{ name, stats }[]`，符合 `createQaEndpoint` 预期的 `{ name }[]`
+- `search` 回调的 `projectPath` 参数被 codegraph 搜索工具原生支持（tools.js 有 `projectPathProperty`）
+- 跨仓库模式链路：`listRepos() → resolveRepo().name → repoBaseMap.set(name, path.dirname(storagePath)) → search(query, name)`，路径验证正确
 
 **状态**: ✅ 已完成
 

@@ -77,7 +77,14 @@ export class AcpClient {
     try {
       const result = await this.connection.newSession({
         cwd: this._cwd,
-        mcpServers: [],
+        mcpServers: [
+          {
+            name: 'codegraph',
+            command: 'npx',
+            args: ['codegraph', 'serve', '--mcp', '--no-watch', '--path', this._cwd],
+            env: [],
+          },
+        ],
       });
       return result.sessionId;
     } catch (err) {
