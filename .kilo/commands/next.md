@@ -7,11 +7,11 @@ description: 分析任务/产品状态，推荐下一步做什么
 ```grep TASKS.md "^| P[0-9]"          // 提取表格行（~50行）
 grep TASKS.md "^## Phase"           // Phase 标题
 grep TASKS.md "^\*\*状态\*\*"       // 详情区块状态行
-grep PROJECT.md "当前阶段\|Level \d" // 自举等级
+grep TASKS.md "^\*\*Phase\b"         // Phase 详情区块标题（含 Timeline 总览表）
 ```
 
 未完成任务（`⬜`/`📋`）对应的详情区块再 read 其 `**涉及文件**` 行。
-**不读 PROJECT.md 全文** — 只需自举 Level 一行。
+**不读 PROJECT.md / TASKS.md 全文** — 只按上面 grep 定位的行读。
 
 ## 逻辑
 
@@ -25,7 +25,7 @@ grep PROJECT.md "当前阶段\|Level \d" // 自举等级
                P0 未开始+有涉 → 实现
                P1/P2 未开始 → 推荐无依赖的先推
                📋 已调研 → 推荐实现
-全部完成 → 读 PROJECT.md 自举行，挑 1-2 产品方向
+全部完成 → 挑 1-2 产品方向推进
 ```
 
 ## 原则
