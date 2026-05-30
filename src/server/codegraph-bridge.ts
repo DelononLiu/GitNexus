@@ -354,32 +354,35 @@ async function sendWikiPage(repoName: string, _req: any, res: any) {
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>${repoName} — opencodewiki</title>
+<title>${repoName} — OpenCodeWiki</title>
 <style>
-*{margin:0;padding:0;box-sizing:border-box;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
-body{background:#f5f5f7;color:#111;min-height:100vh}
+*{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+body{background:#f5f5f7;color:#111}
 .header{position:sticky;top:0;z-index:30;background:#fff;border-bottom:1px solid #e5e7eb;padding:14px 24px;display:flex;align-items:center;gap:12px}
 .header h1{font-size:16px;font-weight:600}
 .header a{color:#007aff;text-decoration:none;font-size:14px;margin-left:auto}
-.main{max-width:800px;margin:0 auto;padding:32px 24px}
+.main{max-width:800px;margin:0 auto;padding:32px 24px 100px}
 .stats{display:flex;gap:16px;margin:20px 0 32px}
 .stat-box{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px 20px;flex:1;text-align:center}
 .stat-box .num{font-size:24px;font-weight:700;color:#007aff}
 .stat-box .label{font-size:12px;color:#888;margin-top:4px}
-.qa-box{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:10px 16px}
-.qa-box textarea{width:100%;border:none;outline:none;font-size:16px;resize:none;overflow:hidden;padding:3px 0;min-height:56px;line-height:1.6;font-family:inherit}
-.qa-box button{padding:8px 22px;background:#007aff;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;float:right}
-.qa-box button:hover{opacity:.88}
-.qa-box textarea::-webkit-scrollbar{width:4px}
-.qa-box textarea::-webkit-scrollbar-thumb{background:#bbb;border-radius:2px}
-.qa-box textarea::-webkit-scrollbar-button{display:none}
 .repo-list{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px}
 .repo-list a{padding:6px 14px;border-radius:20px;border:1px solid #e5e7eb;text-decoration:none;font-size:13px;color:#555;background:#fff}
 .repo-list a.active{background:#007aff;color:#fff;border-color:#007aff}
+.bottom-bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:100%;max-width:640px;z-index:20;padding:0 16px}
+.input-box{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:10px 16px;display:flex;align-items:flex-end;gap:8px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+.input-box:focus-within{border-color:#007aff;box-shadow:0 0 0 3px rgba(0,122,255,.18)}
+.input-box textarea{flex:1;border:none;outline:none;font-size:16px;resize:none;overflow:hidden;padding:3px 0;min-height:56px;line-height:1.6;font-family:inherit}
+.input-box textarea::placeholder{color:#aaa}
+.input-box button{padding:8px 22px;background:#007aff;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer}
+.input-box button:hover{opacity:.88}
+.input-box textarea::-webkit-scrollbar{width:4px}
+.input-box textarea::-webkit-scrollbar-thumb{background:#bbb;border-radius:2px}
+.input-box textarea::-webkit-scrollbar-button{display:none}
 </style></head>
 <body>
 <div class="header">
-  <h1>opencodewiki</h1>
+  <h1 style="color:#007aff;display:inline">OpenCodeWiki</h1> <span style="font-size:13px;color:#888">/ 代码智能问答</span>
   <span style="font-size:13px;color:#888">${repoName}</span>
   <a href="/qa?repo=${encodeURIComponent(repoName)}">Q&A →</a>
 </div>
@@ -390,10 +393,12 @@ body{background:#f5f5f7;color:#111;min-height:100vh}
     <div class="stat-box"><div class="num">${stats.nodes}</div><div class="label">Symbols</div></div>
     <div class="stat-box"><div class="num">${stats.edges ?? '-'}</div><div class="label">Relations</div></div>
   </div>
-  <div class="qa-box">
-    <form action="/qa" method="get">
+</div>
+<div class="bottom-bar">
+  <div class="input-box">
+    <form action="/qa" method="get" style="display:flex;align-items:flex-end;gap:8px;width:100%">
       <input type="hidden" name="repo" value="${repoName}">
-      <textarea name="q" placeholder="Ask about ${repoName}..." rows="2"></textarea>
+      <textarea name="q" placeholder="${repoName} 相关问题..." autocomplete="off"></textarea>
       <button type="submit">Ask</button>
     </form>
   </div>
