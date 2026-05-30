@@ -60,7 +60,7 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-seri
 
 .header{position:sticky;top:0;z-index:30;background:var(--bg-background);border-bottom:1px dashed var(--color-border)}
 .header-inner{display:flex;align-items:center;justify-content:space-between;padding:14px 0}
-.header-left{display:flex;align-items:baseline;gap:10px}
+.header-left{display:flex;align-items:center;gap:10px}
 .header-left h1{font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px}
 .header-repo-name{font-size:10px;color:var(--color-text-secondary);font-weight:500;padding:2px 4px;border-radius:4px;background:var(--bg-secondary)}
 .header-cross-badge{font-size:10px;color:var(--color-purple);font-weight:600;padding:2px 4px;border-radius:4px;background:var(--bg-secondary);border:1px solid var(--color-purple)}
@@ -193,13 +193,12 @@ a.file-ref:hover{text-decoration:underline;border-bottom-style:solid}
   <div class="container-wrapper">
     <div class="header-inner">
       <div class="header-left">
-        <h1 style="color:var(--color-blue);display:inline;font-size:22px">OpenCodeWiki</h1>
+        <h1 style="color:var(--color-blue);display:inline;font-size:20px">OpenCodeWiki</h1>
         <span class="header-repo-name" id="headerRepoName"></span>
         <span class="header-cross-badge" id="headerCrossBadge" style="display:none">Cross-repo</span>
       </div>
       <div class="header-right">
         <button class="btn" onclick="goToWiki()">Wiki</button>
-        <button class="btn" onclick="clearChat()">Clear</button>
         <button class="btn btn-icon" id="themeToggle" onclick="toggleTheme()">&#127769;</button>
       </div>
     </div>
