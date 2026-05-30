@@ -101,7 +101,7 @@ data: {"type":"error","message":"..."}
 |------|------|
 | `OPENCODEWIKI_ACP_ENABLE=true` | 启用 ACP Agent 模式 |
 | `OPENCODEWIKI_ACP_CROSS_ROOT=true` | ACP 跨仓库根目录模式 |
-| `GITNEXUS_QA_DATA_DIR` | QA session 持久化目录（默认 `~/.gitnexus/qa-sessions`） |
+| `OPENCODEWIKI_QA_DATA_DIR` | QA session 持久化目录（默认 `~/.opencodewiki/qa-sessions`） |
 
 **两种问答模式**：
 

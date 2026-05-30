@@ -149,7 +149,7 @@ npm start                       # node 运行 dist/
 核心改动点在 `qa-endpoint.ts` 的 `createQaEndpoint()`：
 - `resolveRepo` — 仓库解析回调
 - `resolveLLMConfig` — LLM 配置回调
-- `search` — 搜索回调（codegraph 替换 gitnexus 的唯一改动点）
+- `search` — 搜索回调
 - 修改 `systemPrompt` 字符串（引用格式、规则）
 
 ---
