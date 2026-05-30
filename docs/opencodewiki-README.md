@@ -1,11 +1,11 @@
-# CodeWiki — DeepWiki 风格代码问答
+# opencodewiki — DeepWiki 风格代码问答
 
 基于 GitNexus 索引的独立 Wiki 问答系统。访问 Wiki 页面时底部有输入框，提问后跳转到独立 Q&A 页面。
 
 ## 文件结构
 
 ```
-codewiki/
+opencodewiki/
 ├── start.sh                 ← 一键启动脚本
 ├── README.md                ← 本文档
 ├── PLAN.md                  ← 架构设计
@@ -24,11 +24,11 @@ codewiki/
 cd gitnexus && npm install && cd ..
 
 # 2. 启动 server
-./codewiki/start.sh
+./opencodewiki/start.sh
 
 # 3. 浏览器打开
-#    http://localhost:4747/codewiki/你的项目名          ← Wiki
-#    http://localhost:4747/codewiki/你的项目名/qa      ← Q&A
+#    http://localhost:4747/opencodewiki/你的项目名          ← Wiki
+#    http://localhost:4747/opencodewiki/你的项目名/qa      ← Q&A
 ```
 
 ## 前置条件
@@ -91,7 +91,7 @@ source ~/.bashrc
 
 ```bash
 # 启动 server
-./codewiki/start.sh
+./opencodewiki/start.sh
 
 # 打开另一个终端测试
 curl -i http://localhost:4747/qa/
@@ -105,5 +105,5 @@ curl -X POST http://localhost:4747/api/qa \
 
 | 文件 | 改动说明 |
 |------|----------|
-| `gitnexus/src/server/api.ts` | 新增路由：`/wiki/`、`/qa/`、`/vendor/`、`/api/qa`、`/codewiki/*` |
+| `gitnexus/src/server/api.ts` | 新增路由：`/wiki/`、`/qa/`、`/vendor/`、`/api/qa`、`/opencodewiki/*` |
 | `gitnexus/src/core/wiki/html-viewer.ts` | Wiki 底部注入 Q&A 输入框 |

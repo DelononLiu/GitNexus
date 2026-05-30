@@ -1,4 +1,4 @@
-# Example — CodeWiki 测试项目
+# Example — opencodewiki 测试项目
 
 极简 TypeScript 项目（~100 行代码），用于快速测试 analyze + wiki + Q&A 流程。
 
@@ -50,7 +50,7 @@ example/
 
 ```bash
 # 1. 分析示例项目
-cd codewiki/example
+cd opencodewiki/example
 gitnexus analyze
 
 # 2. 生成 wiki
@@ -58,7 +58,7 @@ gitnexus wiki
 
 # 3. 启动 server（从 GitNexus 根目录）
 cd /home/long2015/Code/GitNexus
-./codewiki/start.sh
+./opencodewiki/start.sh
 
 # 4. 浏览器打开
 # http://localhost:4747/wiki/?repo=example-tasks

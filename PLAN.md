@@ -1,4 +1,4 @@
-# CodeWiki — DeepWiki-style Q&A for GitNexus
+# opencodewiki — DeepWiki-style Q&A for GitNexus
 
 ## Architecture Overview
 
@@ -22,7 +22,7 @@ User opens wiki
                 │ GET /qa/?q=xxx
                 ▼
 ┌─────────────────────────────────────┐
-│  Q&A 页面 (codewiki/qa/index.html)   │
+│  Q&A 页面 (opencodewiki/qa/index.html)   │
 │                                       │
 │  [对话历史 · 流式打字 · 代码高亮]      │
 │  [引用跳转 · Markdown · 多轮对话]     │
@@ -42,7 +42,7 @@ User opens wiki
 ## File Structure
 
 ```
-codewiki/
+opencodewiki/
 ├── PLAN.md                    ← 本文档
 ├── README.md                  ← 快速开始
 ├── start.sh                   ← 一键启动脚本
@@ -66,9 +66,9 @@ gitnexus/src/
 │   └── api.ts                 ← 加 ~145 行路由
 │       ├─ GET/POST /api/qa    → SS 流式问答 + session
 │       ├─ GET /wiki/          → 静态 serve .gitnexus/wiki/
-│       ├─ GET /vendor/        → 静态 serve codewiki/vendor/
-│       ├─ GET /codewiki/:repo → Wiki 概览
-│       └─ GET /codewiki/:repo/qa, /codewiki/qa/:id → Q&A 页面
+│       ├─ GET /vendor/        → 静态 serve opencodewiki/vendor/
+│       ├─ GET /opencodewiki/:repo → Wiki 概览
+│       └─ GET /opencodewiki/:repo/qa, /opencodewiki/qa/:id → Q&A 页面
 │
 └── core/
     └── wiki/
@@ -79,9 +79,9 @@ gitnexus/src/
 ## Data Flow
 
 ### Wiki → Q&A 跳转
-1. User 打开 `http://localhost:4747/codewiki/项目名` → 服务端返回 wiki/index.html
+1. User 打开 `http://localhost:4747/opencodewiki/项目名` → 服务端返回 wiki/index.html
 2. 页底输入框，user 输入问题 → 回车
-3. 浏览器跳转 `/codewiki/项目名/qa?q=问题内容`
+3. 浏览器跳转 `/opencodewiki/项目名/qa?q=问题内容`
 
 ### Q&A 页面加载
 1. `qa/index.html` 读取 URL 参数 `?q=xxx`
@@ -128,15 +128,15 @@ data: {"type":"error","message":"..."}
 Static file serving for wiki content (index.html + .md files). Per-repo: `?repo=xxx`.
 
 ### GET /qa/
-Static file serving for Q&A page (`codewiki/qa/index.html`).
+Static file serving for Q&A page (`opencodewiki/qa/index.html`).
 
-### GET /codewiki/:repo
+### GET /opencodewiki/:repo
 Wiki overview page for a specific repo.
 
-### GET /codewiki/:repo/qa
+### GET /opencodewiki/:repo/qa
 Q&A page scoped to a repo. Wiki input form submits here.
 
-### GET /codewiki/qa/:id
+### GET /opencodewiki/qa/:id
 Q&A page with session ID for URL sharing / restore.
 
 ## Wiki 页底输入框
@@ -145,7 +145,7 @@ Q&A page with session ID for URL sharing / restore.
 
 ```html
 <div class="qa-entry">
-  <form action="/codewiki/PROJECT_NAME/qa" method="GET" class="qa-form">
+  <form action="/opencodewiki/PROJECT_NAME/qa" method="GET" class="qa-form">
     <input type="text" name="q" placeholder="Ask anything about this codebase..." autocomplete="off">
     <button type="submit">Ask</button>
   </form>
@@ -171,8 +171,8 @@ Q&A page with session ID for URL sharing / restore.
 
 | # | Task | File | Lines |
 |---|------|------|-------|
-| 1 | Q&A 后端 SSE 端点 | `codewiki/server/qa-endpoint.ts` | 80 |
-| 2 | Q&A 前端页面 | `codewiki/qa/index.html` | 200 |
+| 1 | Q&A 后端 SSE 端点 | `opencodewiki/server/qa-endpoint.ts` | 80 |
+| 2 | Q&A 前端页面 | `opencodewiki/qa/index.html` | 200 |
 | 3 | api.ts 加路由 | `gitnexus/src/server/api.ts` | 15 |
 | 4 | wiki 页底输入框 | `gitnexus/src/core/wiki/html-viewer.ts` | 15 |
 

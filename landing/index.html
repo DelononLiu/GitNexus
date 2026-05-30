@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CodeWiki — GitNexus</title>
+<title>opencodewiki — GitNexus</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 
@@ -158,14 +158,14 @@ body{background:var(--page-bg);color:var(--text-title);min-height:100vh;-webkit-
 
   <div class="redirect-overlay" id="redirectOverlay">
     <div class="redirect-spinner"></div>
-    <span>Redirecting to CodeWiki Q&A...</span>
+    <span>Redirecting to opencodewiki Q&A...</span>
   </div>
 
   <!-- ── Header ────────────────── -->
   <header class="header">
-    <a href="/codewiki/" class="header-left logo">
+    <a href="/opencodewiki/" class="header-left logo">
       <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-      CodeWiki
+      opencodewiki
     </a>
   </header>
 
@@ -183,7 +183,7 @@ body{background:var(--page-bg);color:var(--text-title);min-height:100vh;-webkit-
       </div>
       <div class="qa-hero-examples">
         <button onclick="askExample('auth service 的影响范围')">auth service 的影响范围</button>
-        <button onclick="askExample('kcode 和 codewiki 如何集成')">kcode 和 codewiki 如何集成</button>
+        <button onclick="askExample('kcode 和 opencodewiki 如何集成')">kcode 和 opencodewiki 如何集成</button>
         <button onclick="askExample('Explain the project architecture')">Project architecture</button>
         <button onclick="askExample('How does the data flow work?')">Data flow</button>
       </div>
@@ -237,7 +237,7 @@ body{background:var(--page-bg);color:var(--text-title);min-height:100vh;-webkit-
 
   <!-- ── Footer ────────────────── -->
   <footer class="footer">
-    <span>CodeWiki &mdash; Open Source Code Intelligence</span>
+    <span>opencodewiki &mdash; Open Source Code Intelligence</span>
   </footer>
 
 </div>
@@ -290,7 +290,7 @@ function submitCrossRepoQa() {
   var q = qaInput.value.trim();
   if (!q) return;
   redirectOverlay.classList.add('show');
-  var url = '/codewiki/qa?q=' + encodeURIComponent(q);
+  var url = '/opencodewiki/qa?q=' + encodeURIComponent(q);
   // Wait briefly for overlay to render, then redirect
   setTimeout(function() { location.href = url; }, 150);
 }
@@ -388,7 +388,7 @@ function renderGrid() {
 
   for (var i = 0; i < filtered.length; i++) {
     var r = filtered[i], stats = r.stats || {}, delay = Math.min(i + 1, 6);
-    html += '<div class="fade-in stagger-delay-' + delay + '"><a href="/codewiki/' + encodeURIComponent(r.name) + '" class="repo-card">';
+    html += '<div class="fade-in stagger-delay-' + delay + '"><a href="/opencodewiki/' + encodeURIComponent(r.name) + '" class="repo-card">';
     html += '<div class="repo-card-content">';
     html += '<svg class="repo-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v12"/><path d="M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M15 6a9 9 0 0 0-9 9"/></svg>';
     html += '<div class="repo-card-info"><div class="repo-card-name">' + escapeHtml(r.name) + '</div>';
@@ -447,7 +447,7 @@ async function startAnalysis() {
         analyzerProgress.innerHTML = '<div class="analyzer-progress" style="color:#34d399">Analysis complete! Redirecting...</div>';
         setTimeout(function() {
           var name = status.repoName || status.repoPath || '';
-          window.location.href = name ? '/codewiki/' + encodeURIComponent(name) : '/codewiki/';
+          window.location.href = name ? '/opencodewiki/' + encodeURIComponent(name) : '/opencodewiki/';
         }, 1000);
         return;
       }

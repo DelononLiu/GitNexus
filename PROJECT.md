@@ -1,6 +1,6 @@
-# CodeWiki — 开源代码问答系统
+# opencodewiki — 开源代码问答系统
 
-CodeWiki 是一个基于 Tree‑sitter 的开源代码问答系统，支持**纯 LLM 模式**和**ACP Agent 模式**两种问答方式。底层引擎使用 [codegraph](https://github.com/colbymchenry/codegraph)（TypeScript + SQLite + MCP）。
+opencodewiki 是一个基于 Tree‑sitter 的开源代码问答系统，支持**纯 LLM 模式**和**ACP Agent 模式**两种问答方式。底层引擎使用 [codegraph](https://github.com/colbymchenry/codegraph)（TypeScript + SQLite + MCP）。
 
 > 本项目是 `opencodewiki` 分支，从 GitNexus 项目中独立出来的 CodeWiki 演进版本。
 
@@ -99,14 +99,14 @@ data: {"type":"error","message":"..."}
 
 | 变量 | 作用 |
 |------|------|
-| `CODEWIKI_ACP_ENABLE=true` | 启用 ACP Agent 模式 |
-| `CODEWIKI_ACP_CROSS_ROOT=true` | ACP 跨仓库根目录模式 |
+| `OPENCODEWIKI_ACP_ENABLE=true` | 启用 ACP Agent 模式 |
+| `OPENCODEWIKI_ACP_CROSS_ROOT=true` | ACP 跨仓库根目录模式 |
 | `GITNEXUS_QA_DATA_DIR` | QA session 持久化目录（默认 `~/.gitnexus/qa-sessions`） |
 
 **两种问答模式**：
 
 1. **纯 LLM 模式**（默认）— `qa-endpoint` 搜索代码 + 构造 system prompt → 调 LLM API → SSE 流式返回
-2. **ACP Agent 模式**（`CODEWIKI_ACP_ENABLE=true`）— Agent 自主决策调用 codegraph MCP 工具 + 平台内置 grep/glob/read
+2. **ACP Agent 模式**（`OPENCODEWIKI_ACP_ENABLE=true`）— Agent 自主决策调用 codegraph MCP 工具 + 平台内置 grep/glob/read
 
 ---
 
@@ -217,7 +217,7 @@ interface QaSession {
 
 ### `src/acp/callbacks.ts`
 
-`CodeWikiACPClient` implements ACP Client 接口，维护会话级 handler Map，支持：
+`opencodewikiACPClient` implements ACP Client 接口，维护会话级 handler Map，支持：
 - `setSessionHandler(sessionId, handler)` — 注册流式回调
 - 文件读写回调（`writeTextFile` / `readTextFile`）
 - `requestPermission` — MVP auto-accept

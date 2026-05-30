@@ -1,11 +1,11 @@
-# CodeWiki — AI Agent 开发指南
+# opencodewiki — AI Agent 开发指南
 
 > **📖 先读 `PROJECT.md`** — 包含文件索引、API 定义、数据流，避免重复全局搜索。
 > **📋 任务在 `TASKS.md`** — 每个任务包含涉及文件、调研结果、状态，新 session 直接定位无需重扫工程。
 
 ## 项目定位
 
-CodeWiki — 基于 Tree‑sitter 的开源代码问答系统。底层引擎 [codegraph](https://github.com/colbymchenry/codegraph) (TypeScript + SQLite + MCP)。支持两种问答模式：
+opencodewiki — 基于 Tree‑sitter 的开源代码问答系统。底层引擎 [codegraph](https://github.com/colbymchenry/codegraph) (TypeScript + SQLite + MCP)。支持两种问答模式：
 - **纯 LLM 模式** — `qa-endpoint` 搜索代码 + 构造 system prompt → 调 LLM API → SSE 流式返回
 - **ACP Agent 模式** — Agent 自主决策调用 codegraph MCP 工具 + 平台内置 grep/glob/read
 

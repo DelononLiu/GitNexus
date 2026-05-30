@@ -138,8 +138,8 @@ function log(level: 'info' | 'warn' | 'error' | 'debug', msg: string, data?: Rec
   console.error('[' + ts + '] [qa] [' + level + '] ' + line);
 }
 
-const ACP_ENABLED = process.env.CODEWIKI_ACP_ENABLE === 'true';
-const ACP_CROSS_ROOT = process.env.CODEWIKI_ACP_CROSS_ROOT === 'true';
+const ACP_ENABLED = process.env.OPENCODEWIKI_ACP_ENABLE === 'true';
+const ACP_CROSS_ROOT = process.env.OPENCODEWIKI_ACP_CROSS_ROOT === 'true';
 const CROSS_REPO_ACP_CLIENT = '__cross__';
 
 const repoClients = new Map<string, AcpClient>();
@@ -735,7 +735,7 @@ export function createQaEndpoint(
       s.filePath + (s.startLine ? ':' + s.startLine + (s.endLine && s.endLine !== s.startLine ? '-' + s.endLine : '') : '')
     ).join('\n- ');
 
-    const systemPrompt = 'You are codewiki, a code analyst. Answer the question in DeepWiki style.\n\n' +
+    const systemPrompt = 'You are opencodewiki, a code analyst. Answer the question in DeepWiki style.\n\n' +
       '## SEARCH CONTEXT\n' +
       'The following files were found across repositories. ONLY reference files from this list:\n\n' +
       '- ' + sourceRefs + (flowsText ? '\n\n### Execution Flows\n' + flowsText.slice(0, 2000) : '') + '\n\n' +

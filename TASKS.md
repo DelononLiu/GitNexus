@@ -1,7 +1,7 @@
-# CodeWiki — 任务注册中心
+# opencodewiki — 任务注册中心
 
 > **分支**: `opencodewiki`（可独立提取为 repo）
-> **目标**: 将 codewiki 底层引擎从 GitNexus 替换为基于 Tree‑sitter 的开源方案，分阶段演进。
+> **目标**: 将 opencodewiki 底层引擎从 GitNexus 替换为基于 Tree‑sitter 的开源方案，分阶段演进。
 >
 > 每个 session 从这里开始。AI 读取此文件定位到具体任务，获取涉及文件列表后直接开工，无需重扫工程。
 > **Phase 概述**详见 `PROJECT.md`。
@@ -55,11 +55,11 @@
 
 ## Phase 1: 底座迁移
 
-将 codewiki 的底层代码引擎从 GitNexus 替换为 **codegraph** (`@colbymchenry/codegraph`)，保持 Wiki + QA + 搜索功能不变。
+将 opencodewiki 的底层代码引擎从 GitNexus 替换为 **codegraph** (`@colbymchenry/codegraph`)，保持 Wiki + QA + 搜索功能不变。
 
 ### 迁移策略
 
-- **增量模式**：在 `opencodewiki/` 内开发，**不修改**原 `codewiki/` 任何文件
+- **增量模式**：在 `opencodewiki/` 内开发，**不修改**原 `opencodewiki/` 任何文件
 - **独立 repo 视角**：按独立仓库组织，后续可直接抽出
 
 | 任务 | 说明 | 状态 | 优先级 |

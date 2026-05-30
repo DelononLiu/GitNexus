@@ -8,7 +8,7 @@ function log(level: string, msg: string, data?: Record<string, unknown>) {
   console.error('[' + ts + '] [acp] [' + level + '] ' + line);
 }
 
-export class CodeWikiACPClient implements acp.Client {
+export class OpenCodeWikiACPClient implements acp.Client {
   private sessionHandlers = new Map<string, AcpMessageHandler>();
   private _lastActivityTime = 0;
 
@@ -79,12 +79,12 @@ export class CodeWikiACPClient implements acp.Client {
   }
 
   async writeTextFile(params: acp.WriteTextFileRequest): Promise<acp.WriteTextFileResponse> {
-    log('warn', 'writeTextFile called but CodeWiki is read-only', { path: params.path });
+    log('warn', 'writeTextFile called but opencodewiki is read-only', { path: params.path });
     return {};
   }
 
   async readTextFile(params: acp.ReadTextFileRequest): Promise<acp.ReadTextFileResponse> {
-    log('warn', 'readTextFile called but CodeWiki session has no filesystem context', { path: params.path });
+    log('warn', 'readTextFile called but opencodewiki session has no filesystem context', { path: params.path });
     return { content: '' };
   }
 }

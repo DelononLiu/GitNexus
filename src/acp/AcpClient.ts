@@ -1,6 +1,6 @@
 import type * as acp from '@agentclientprotocol/sdk';
 import { AgentManager } from './AgentManager.js';
-import { CodeWikiACPClient } from './callbacks.js';
+import { OpenCodeWikiACPClient } from './callbacks.js';
 import type { AcpMessageHandler } from './types.js';
 
 function log(level: string, msg: string, data?: Record<string, unknown>) {
@@ -12,7 +12,7 @@ function log(level: string, msg: string, data?: Record<string, unknown>) {
 export class AcpClient {
   private connection: acp.ClientSideConnection | null = null;
   private agentManager: AgentManager;
-  private client: CodeWikiACPClient | null = null;
+  private client: OpenCodeWikiACPClient | null = null;
   private _connected = false;
   private _lastError = '';
   private _cwd = '';
@@ -40,7 +40,7 @@ export class AcpClient {
 
       const stream = sdk.ndJsonStream(input, output);
 
-      this.client = new CodeWikiACPClient();
+      this.client = new OpenCodeWikiACPClient();
       this.connection = new sdk.ClientSideConnection(
         () => this.client!,
         stream,
@@ -52,8 +52,8 @@ export class AcpClient {
           fs: { readTextFile: true, writeTextFile: true },
         },
         clientInfo: {
-          name: 'codewiki',
-          title: 'CodeWiki',
+          name: 'opencodewiki',
+          title: 'opencodewiki',
           version: '1.0.0',
         },
       });
