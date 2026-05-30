@@ -26,7 +26,7 @@ opencodewiki/
 │   └── index.ts                    # 入口（导出 createQaEndpoint）
 ├── qa/
 │   └── index.html                  # Q&A 前端（SSE 流式 + Markdown + 代码高亮）
-├── landing/
+├── home/
 │   └── index.html                  # Wiki 概览页面
 ├── vendor/
 │   ├── marked.min.js               # Markdown 渲染

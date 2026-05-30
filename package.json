@@ -9,7 +9,7 @@
     "build": "npx tsc"
   },
   "dependencies": {
-    "@colbymchenry/codegraph": "^0.8.0",
+    "@colbymchenry/codegraph": "file:./engine/codegraph",
     "express": "^4.21.0",
     "cors": "^2.8.5"
   },

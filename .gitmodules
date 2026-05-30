@@ -1,0 +1,4 @@
+[submodule "engine/codegraph"]
+	path = engine/codegraph
+	url = https://github.com/colbymchenry/codegraph.git
+	# 不设置 branch，submodule 固定到当前 commit，不会因 --remote 自动升级

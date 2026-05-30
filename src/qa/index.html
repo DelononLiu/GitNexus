@@ -253,7 +253,7 @@ function escapeHtml(str) {
 }
 
 function goToWiki() {
-  location.href = currentRepo ? '/opencodewiki/' + encodeURIComponent(currentRepo) : '/api/wiki/';
+  location.href = currentRepo ? '/' + encodeURIComponent(currentRepo) : '/api/wiki/';
 }
 
 function scrollToBottom() {
@@ -289,7 +289,7 @@ function createSessionBlock(question) {
   block.className = 'session-block';
   block.id = blockId;
   block.innerHTML = `
-    <div class="breadcrumb"><a href="${currentRepo ? '/opencodewiki/' + encodeURIComponent(currentRepo) : '/opencodewiki/'}">\u2190 ${currentRepo ? 'Overview' : 'All repos'}</a></div>
+    <div class="breadcrumb"><a href="${currentRepo ? '/' + encodeURIComponent(currentRepo) : '/'}">\u2190 ${currentRepo ? 'Overview' : 'All repos'}</a></div>
     <div class="question-title">
       <span class="question-text">${escapeHtml(question)}</span>
       <span class="fast-badge">Fast</span>
@@ -640,7 +640,7 @@ async function sendMessage(e) {
           const data = JSON.parse(trimmed.slice(6));
           if (data.type === 'session') {
             currentSessionId = data.id;
-            const sessionUrl = '/opencodewiki/qa/' + currentSessionId;
+            const sessionUrl = '/qa/' + currentSessionId;
             history.replaceState(null, '', sessionUrl);
             console.log('[qa] session', data.id);
           } else if (data.type === 'sources') {
@@ -699,7 +699,7 @@ function clearChat() {
   input.style.height = 'auto';
   updateSendBtn();
   input.focus();
-  history.replaceState(null, '', '/opencodewiki/qa');
+  history.replaceState(null, '', '/qa');
 }
 
 function askSuggestion(text) {
@@ -720,7 +720,7 @@ function shareBlock(blockId) {
   const block = document.getElementById(blockId);
   if (!block) return;
   const url = currentSessionId
-    ? location.origin + '/opencodewiki/qa/' + currentSessionId
+    ? location.origin + '/qa/' + currentSessionId
     : location.href;
   try {
     navigator.clipboard.writeText(url);
@@ -758,14 +758,14 @@ if (savedTheme === 'dark') {
 
 mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose' });
 
-const pathRepoMatch = location.pathname.match(/^\/opencodewiki\/(?!qa\b)([^/]+)\/qa/);
+const pathRepoMatch = location.pathname.match(/^\/(?!qa\b)([^/]+)\/qa/);
 let currentRepo = pathRepoMatch?.[1] || new URLSearchParams(location.search).get('repo') || undefined;
 const headerRepoName = document.getElementById('headerRepoName');
 const headerCrossBadge = document.getElementById('headerCrossBadge');
 if (currentRepo) { headerRepoName.textContent = currentRepo; document.title = currentRepo + ' — opencodewiki Q&A'; document.getElementById('qaInput').placeholder = 'Ask about ' + currentRepo + '...'; }
 else { headerCrossBadge.style.display = 'inline'; document.title = 'opencodewiki Q&A (Cross-repo)'; document.getElementById('emptyTitle').textContent = 'Ask across all repositories'; document.getElementById('emptyDesc').textContent = 'I can search across all indexed codebases to find answers.'; }
 
-const sessionMatch = location.pathname.match(/^\/opencodewiki\/qa\/([^/]+)/);
+const sessionMatch = location.pathname.match(/^\/qa\/([^/]+)/);
 const currentSessionIdFromUrl = sessionMatch?.[1] || null;
 
 async function restoreSession(sessionId) {

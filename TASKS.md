@@ -45,7 +45,7 @@
 - `src/acp/index.ts` — 统一导出
 - `src/index.ts` — 入口导出
 - `qa/index.html` — Q&A 前端页面
-- `landing/index.html` — Wiki 概览页面
+- `home/index.html` — Wiki 概览页面
 - `vendor/` — marked / highlight.js / mermaid
 - `start.sh` — 启动脚本
 
@@ -65,8 +65,8 @@
 | 任务 | 说明 | 状态 | 优先级 |
 |------|------|------|--------|
 | P1-01 | 完成 codegraph-bridge Express 路由 + 静态服务 + QA 集成（全功能） | ✅ 已完成 | P0 |
-| P1-02 | search 回调从 gitnexus 改为 codegraph API | 📋 已调研 | P0 |
-| P1-03 | 更新 systemPrompt 中工具名和引用格式 | 📋 已调研 | P0 |
+| P1-02 | search 回调从 gitnexus 改为 codegraph API | ✅ 已完成 | P0 |
+| P1-03 | 更新 systemPrompt 中工具名和引用格式 | ✅ 已完成 | P0 |
 | P1-04 | ACP Agent 模式 MCP 工具注册切换为 codegraph | ⬜ 未开始 | P1 |
 | P1-05 | 跨仓库搜索验证（`listRepos` 回调对接） | ⬜ 未开始 | P1 |
 
@@ -79,7 +79,7 @@
 - 修复 `ToolHandler` 导入路径为 `@colbymchenry/codegraph/dist/mcp/index.js`
 - 添加 `CodeGraph.init()` 懒初始化，自动创建 `.codegraph/` 目录
 - 添加静态文件服务：`/vendor/*` → vendor 目录（JS/CSS）
-- 添加前端页面路由：`/opencodewiki/` → landing，`/opencodewiki/qa` → QA
+- 添加前端页面路由：`/` → 首页，`/qa` → QA
 - 集成 `createQaEndpoint` 注册 `POST /api/qa`（SSE 流式问答）
 - 添加 `GET /api/qa/session/:id` 会话查询
 - 实现 `search` 回调调用 codegraph 搜索
@@ -99,10 +99,14 @@
 **调研结果**:
 - `search: (query, repo?) => Promise<{sources, flows?}>` — 接收搜索词和仓库名，返回源码片段和执行流
 - 调用点：`qa-endpoint.ts:612`（单仓库）和 `:607`（跨仓库）
-- 当前上层（暂未接入）预期通过 `codegraph_search` + `codegraph_context` 组合实现
 - sources 格式兼容 codegraph 返回的 `{ filePath, label, startLine, endLine, name }`
 
-**状态**: 📋 已调研
+**实现概要**:
+- `codegraph-bridge.ts` 的 search 回调先调 `codegraph_search` 获取候选结果
+- 对前 3 个含符号名的结果并行调 `codegraph_context` 获取深度上下文
+- 合并 context 文本为 `flows` 字段返回
+
+**状态**: ✅ 已完成
 
 ### P1-03: 更新 systemPrompt 中工具名和引用格式
 
@@ -115,10 +119,12 @@
 
 **调研结果**:
 - 第 753 行包含硬编码搜索链路：`gitnexus_query → gitnexus_cypher → gitnexus_context → grep`
-- 改为：`codegraph_search → codegraph_context → codegraph_impact → (平台 grep)`
 - 引用路径格式：`relative/path/file.ts:line`（当前已适配 codegraph 的相对路径）
 
-**状态**: 📋 已调研
+**实现概要**:
+- `qa-endpoint.ts:753` systemPrompt 中搜索链路替换为 `codegraph_search → codegraph_context → codegraph_impact → grep`
+
+**状态**: ✅ 已完成
 
 ---
 

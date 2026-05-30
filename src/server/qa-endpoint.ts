@@ -750,7 +750,7 @@ export function createQaEndpoint(
       '- If unsure, say so.\n' +
       '- 禁止写文件，所有内容直接输出。\n' +
       '- 禁止使用 Explore Task。\n' +
-      '- **问题相关信息搜索链路：gitnexus_query（自然语言探索执行流）→ gitnexus_cypher（精确图模式验证）→ gitnexus_context（单符号深度分析）→ grep（纯文本 fallback/提取）**\n' + 
+      '- **问题相关信息搜索链路：codegraph_search（语义搜索符号）→ codegraph_context（单符号深度分析）→ codegraph_impact（影响范围）→ grep（纯文本 fallback/提取）**\n' + 
       '- 每个回答至少包含 2 个引用，最多包含 6 个引用。\n' +
       '- **引用必须使用上方 SEARCH CONTEXT 中列出的精确路径，禁止编造不存在的文件路径。**\n' +
       (isCrossRepo

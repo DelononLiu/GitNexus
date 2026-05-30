@@ -3,6 +3,7 @@ node_modules/
 
 # Build output
 dist/
+!engine/*/dist/
 
 # TypeScript
 *.tsbuildinfo
@@ -17,9 +18,9 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Environment
-.env
-.env.local
+# Environment (not used — config goes in ~/.opencodewiki/config.json)
+# .env
+# .env.local
 
 # Logs
 *.log

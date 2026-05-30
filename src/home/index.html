@@ -163,7 +163,7 @@ body{background:var(--page-bg);color:var(--text-title);min-height:100vh;-webkit-
 
   <!-- ── Header ────────────────── -->
   <header class="header">
-    <a href="/opencodewiki/" class="header-left logo">
+    <a href="/" class="header-left logo">
       <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
       opencodewiki
     </a>
@@ -290,7 +290,7 @@ function submitCrossRepoQa() {
   var q = qaInput.value.trim();
   if (!q) return;
   redirectOverlay.classList.add('show');
-  var url = '/opencodewiki/qa?q=' + encodeURIComponent(q);
+  var url = '/qa?q=' + encodeURIComponent(q);
   // Wait briefly for overlay to render, then redirect
   setTimeout(function() { location.href = url; }, 150);
 }
@@ -322,7 +322,7 @@ function formatRelativeTime(dateStr) {
 
 function setServerStatus(connected) {
   serverDot.className = 'dot ' + (connected ? 'online' : 'offline');
-  statusLabel.textContent = connected ? 'Index your code with GitNexus' : 'Server offline — start GitNexus';
+  statusLabel.textContent = connected ? 'Index your code with CodeGraph' : 'Server offline';
 }
 
 // ── Repo search ────────────────────────────────────
@@ -362,7 +362,7 @@ async function loadRepos() {
     repos = [];
     loadingState.style.display = 'none';
     emptyState.style.display = 'block';
-    emptyState.innerHTML = '<p>Could not connect to server. Start GitNexus to get started.</p>';
+    emptyState.innerHTML = '<p>Could not connect to server. Start opencodewiki to get started.</p>';
   }
 }
 
@@ -388,7 +388,7 @@ function renderGrid() {
 
   for (var i = 0; i < filtered.length; i++) {
     var r = filtered[i], stats = r.stats || {}, delay = Math.min(i + 1, 6);
-    html += '<div class="fade-in stagger-delay-' + delay + '"><a href="/opencodewiki/' + encodeURIComponent(r.name) + '" class="repo-card">';
+    html += '<div class="fade-in stagger-delay-' + delay + '"><a href="/' + encodeURIComponent(r.name) + '" class="repo-card">';
     html += '<div class="repo-card-content">';
     html += '<svg class="repo-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v12"/><path d="M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M15 6a9 9 0 0 0-9 9"/></svg>';
     html += '<div class="repo-card-info"><div class="repo-card-name">' + escapeHtml(r.name) + '</div>';
@@ -447,7 +447,7 @@ async function startAnalysis() {
         analyzerProgress.innerHTML = '<div class="analyzer-progress" style="color:#34d399">Analysis complete! Redirecting...</div>';
         setTimeout(function() {
           var name = status.repoName || status.repoPath || '';
-          window.location.href = name ? '/opencodewiki/' + encodeURIComponent(name) : '/opencodewiki/';
+          window.location.href = name ? '/' + encodeURIComponent(name) : '/';
         }, 1000);
         return;
       }
@@ -468,7 +468,7 @@ async function startAnalysis() {
   var ok = await probeServer();
   setServerStatus(ok);
   if (ok) await loadRepos();
-  else { loadingState.style.display = 'none'; emptyState.style.display = 'block'; emptyState.innerHTML = '<p>Could not connect to GitNexus server.</p>'; }
+  else { loadingState.style.display = 'none'; emptyState.style.display = 'block'; emptyState.innerHTML = '<p>Could not connect to opencodewiki server.</p>'; }
 })();
 </script>
 
