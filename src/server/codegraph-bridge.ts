@@ -382,7 +382,7 @@ body{background:#f5f5f7;color:#111}
 </style></head>
 <body>
 <div class="header">
-  <h1 style="color:#007aff;display:inline">OpenCodeWiki</h1> <span style="font-size:13px;color:#888">/ 代码智能问答</span>
+  <h1 style="color:#007aff;display:inline">OpenCodeWiki</h1> <span style="font-size:13px;color:#888">/ 你的代码智能问答助手</span>
   <span style="font-size:13px;color:#888">${repoName}</span>
   <a href="/qa?repo=${encodeURIComponent(repoName)}">Q&A →</a>
 </div>

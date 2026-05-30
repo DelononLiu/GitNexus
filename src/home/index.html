@@ -33,10 +33,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Robot
 .sidebar-empty{font-size:12px;color:var(--text3);padding:12px;text-align:center}
 
 /* Main area */
-.main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 40px;min-width:0;overflow-y:auto}
+.main{flex:1;display:flex;flex-direction:column;align-items:center;padding:25vh 40px 0;min-width:0;overflow-y:auto}
 .qa-box{max-width:640px;width:100%;margin:0 auto}
-.qa-welcome{text-align:center;margin-bottom:20px}
-.qa-welcome-title{font-size:22px;font-weight:700;color:var(--blue);letter-spacing:-.02em}
+.qa-welcome{text-align:center;margin-bottom:16px;position:relative;top:-60px}
+.qa-welcome-title{font-size:28px;font-weight:700;color:var(--blue);letter-spacing:-.02em}
 .qa-welcome-sub{font-size:13px;color:var(--text3);font-weight:400;letter-spacing:normal}
 .repo-section{width:800px;margin:0 auto;flex-shrink:0}
 .qa-input-wrap{display:flex;align-items:flex-end;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:10px 16px;transition:box-shadow .2s;box-shadow:0 2px 8px rgba(0,0,0,.04)}
@@ -96,7 +96,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Robot
 <div class="main" id="mainArea">
   <div class="qa-box">
     <div class="qa-welcome">
-      <div class="qa-welcome-title">OpenCodeWiki <span class="qa-welcome-sub">/ 代码智能问答</span></div>
+      <div class="qa-welcome-title">OpenCodeWiki <span class="qa-welcome-sub">/ 你的代码智能问答助手</span></div>
     </div>
     <div class="qa-input-wrap">
       <textarea id="qaInput" rows="1" placeholder="输入代码库相关问题..." autocomplete="off"></textarea>
