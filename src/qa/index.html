@@ -60,10 +60,10 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-seri
 
 .header{position:sticky;top:0;z-index:30;background:var(--bg-background);border-bottom:1px dashed var(--color-border)}
 .header-inner{display:flex;align-items:center;justify-content:space-between;padding:14px 0}
-.header-left{display:flex;align-items:center;gap:10px}
+.header-left{display:flex;align-items:baseline;gap:10px}
 .header-left h1{font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px}
-.header-repo-name{font-size:11px;color:var(--color-text-secondary);font-weight:500;padding:3px 8px;border-radius:4px;background:var(--bg-secondary)}
-.header-cross-badge{font-size:11px;color:var(--color-purple);font-weight:600;padding:3px 8px;border-radius:4px;background:var(--bg-secondary);border:1px solid var(--color-purple)}
+.header-repo-name{font-size:10px;color:var(--color-text-secondary);font-weight:500;padding:2px 4px;border-radius:4px;background:var(--bg-secondary)}
+.header-cross-badge{font-size:10px;color:var(--color-purple);font-weight:600;padding:2px 4px;border-radius:4px;background:var(--bg-secondary);border:1px solid var(--color-purple)}
 .header-right{display:flex;align-items:center;gap:10px}
 .btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:6px;font-size:13px;cursor:pointer;border:1px solid var(--color-border);background:transparent;color:var(--color-text-primary);transition:all .15s}
 .btn:hover{background:var(--bg-secondary)}
@@ -193,7 +193,7 @@ a.file-ref:hover{text-decoration:underline;border-bottom-style:solid}
   <div class="container-wrapper">
     <div class="header-inner">
       <div class="header-left">
-        <h1 style="color:var(--color-blue);display:inline">OpenCodeWiki</h1> <span style="font-size:13px;color:var(--color-text-secondary)">/ 你的代码智能问答助手</span>
+        <h1 style="color:var(--color-blue);display:inline;font-size:22px">OpenCodeWiki</h1>
         <span class="header-repo-name" id="headerRepoName"></span>
         <span class="header-cross-badge" id="headerCrossBadge" style="display:none">Cross-repo</span>
       </div>
@@ -776,8 +776,8 @@ const pathRepoMatch = location.pathname.match(/^\/(?!qa\b)([^/]+)\/qa/);
 let currentRepo = pathRepoMatch?.[1] || new URLSearchParams(location.search).get('repo') || undefined;
 const headerRepoName = document.getElementById('headerRepoName');
 const headerCrossBadge = document.getElementById('headerCrossBadge');
-if (currentRepo) { headerRepoName.textContent = currentRepo; document.title = currentRepo + ' — OpenCodeWiki Q&A'; document.getElementById('qaInput').placeholder = currentRepo + ' 相关问题...'; }
-else { headerCrossBadge.style.display = 'inline'; document.title = 'OpenCodeWiki Q&A (Cross-repo)'; document.getElementById('emptyTitle').textContent = 'Ask across all repositories'; document.getElementById('emptyDesc').textContent = 'I can search across all indexed codebases to find answers.'; }
+if (currentRepo) { headerRepoName.textContent = currentRepo; headerRepoName.style.display = ''; headerCrossBadge.style.display = 'none'; document.title = currentRepo + ' — OpenCodeWiki Q&A'; document.getElementById('qaInput').placeholder = currentRepo + ' 相关问题...'; }
+else { headerRepoName.style.display = 'none'; headerCrossBadge.style.display = 'inline'; document.title = 'OpenCodeWiki Q&A (Cross-repo)'; document.getElementById('emptyTitle').textContent = 'Ask across all repositories'; document.getElementById('emptyDesc').textContent = 'I can search across all indexed codebases to find answers.'; }
 
 const sessionMatch = location.pathname.match(/^\/qa\/([^/]+)/);
 const currentSessionIdFromUrl = sessionMatch?.[1] || null;
@@ -789,7 +789,7 @@ async function restoreSession(sessionId) {
     if (!resp.ok) return;
     const session = await resp.json();
     if (!session.messages || session.messages.length === 0) return;
-    if (session.repo) { currentRepo = session.repo; headerRepoName.textContent = session.repo; headerRepoName.style.display = ''; headerCrossBadge.style.display = 'none'; document.getElementById('qaInput').placeholder = 'Ask about ' + session.repo + '...'; document.title = session.repo + ' — opencodewiki Q&A'; }
+    if (session.repo) { currentRepo = session.repo; headerRepoName.textContent = session.repo; headerRepoName.style.display = ''; headerCrossBadge.style.display = 'none'; document.getElementById('qaInput').placeholder = session.repo + ' 相关问题...'; document.title = session.repo + ' — OpenCodeWiki Q&A'; }
     let lastBlockId = null;
     for (let i = 0; i < session.messages.length; i += 2) {
       const userMsg = session.messages[i];
