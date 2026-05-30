@@ -1,0 +1,9 @@
+{
+  "name": "example-tasks",
+  "version": "1.0.0",
+  "description": "Minimal example project for CodeWiki testing",
+  "type": "module",
+  "scripts": {
+    "start": "node dist/main.js"
+  }
+}
