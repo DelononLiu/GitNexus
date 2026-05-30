@@ -1,4 +1,4 @@
-# opencodewiki — DeepWiki 风格代码问答
+# OpenCodeWiki — DeepWiki 风格代码问答
 
 基于 GitNexus 索引的独立 Wiki 问答系统。访问 Wiki 页面时底部有输入框，提问后跳转到独立 Q&A 页面。
 

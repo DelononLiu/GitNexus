@@ -1,7 +1,7 @@
-# opencodewiki Q&A — File Reference Linkification Issues
+# OpenCodeWiki Q&A — File Reference Linkification Issues
 
 **Date:** 2026-05-27
-**Scope:** `opencodewiki/server/qa-endpoint.ts` + `opencodewiki/qa/index.html`
+**Scope:** `OpenCodeWiki/server/qa-endpoint.ts` + `OpenCodeWiki/qa/index.html`
 
 ## Summary
 

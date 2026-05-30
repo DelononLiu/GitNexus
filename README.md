@@ -43,7 +43,7 @@ node engine/codegraph/dist/bin/codegraph.js index ~/Code/example
 
 # 6. 启动服务
 npm run dev
-# opencodewiki server running on http://localhost:4747
+# OpenCodeWiki server running on http://localhost:4747
 ```
 
 ## 引擎更新

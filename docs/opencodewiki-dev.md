@@ -38,7 +38,7 @@ LD_LIBRARY_PATH=`pwd`/../opencodewiki/lib/ npx tsx src/cli/index.ts analyze /som
 - `GITNEXUS_SKIP_OPTIONAL_GRAMMARS=1` 跳过 `tree-sitter-dart`/`tree-sitter-proto` 的 `postinstall` 编译
 - `tree-sitter-kotlin` 已 vendored（`vendor/tree-sitter-kotlin/`），带有预编译 `.node` 二进制，无需额外编译
 - 如需重新编译 kotlin（如换 Node 版本）：`NODE_BIN=~/nodejs/bin node scripts/build-tree-sitter-kotlin.cjs`
-- 启动 server 后自带 opencodewiki Q&A 功能：`http://localhost:4747/opencodewiki/<repo>/qa`
+- 启动 server 后自带 OpenCodeWiki Q&A 功能：`http://localhost:4747/opencodewiki/<repo>/qa`
 - build 时注意 `node scripts/build.js` 依赖 `node` 在 PATH 中（worktree 内需 `export PATH=...`）
 
 ### 二、打包 dist 模式

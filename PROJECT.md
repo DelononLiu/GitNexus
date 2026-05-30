@@ -1,6 +1,6 @@
-# opencodewiki — 开源代码问答系统
+# OpenCodeWiki — 开源代码问答系统
 
-opencodewiki 是一个基于 Tree‑sitter 的开源代码问答系统，支持**纯 LLM 模式**和**ACP Agent 模式**两种问答方式。底层引擎使用 [codegraph](https://github.com/colbymchenry/codegraph)（TypeScript + SQLite + MCP）。
+OpenCodeWiki 是一个基于 Tree‑sitter 的开源代码问答系统，支持**纯 LLM 模式**和**ACP Agent 模式**两种问答方式。底层引擎使用 [codegraph](https://github.com/colbymchenry/codegraph)（TypeScript + SQLite + MCP）。
 
 > 本项目是 `opencodewiki` 分支，从 GitNexus 项目中独立出来的 CodeWiki 演进版本。
 

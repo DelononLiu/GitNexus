@@ -1,4 +1,4 @@
-# opencodewiki — DeepWiki-style Q&A for GitNexus
+# OpenCodeWiki — DeepWiki-style Q&A for GitNexus
 
 ## Architecture Overview
 

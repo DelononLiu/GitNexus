@@ -1,4 +1,4 @@
-# Example — opencodewiki 测试项目
+# Example — OpenCodeWiki 测试项目
 
 极简 TypeScript 项目（~100 行代码），用于快速测试 analyze + wiki + Q&A 流程。
 

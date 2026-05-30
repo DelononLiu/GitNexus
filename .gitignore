@@ -18,7 +18,6 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Environment (not used — config goes in ~/.opencodewiki/config.json)
 # .env
 # .env.local
 

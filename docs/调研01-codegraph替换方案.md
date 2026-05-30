@@ -1,6 +1,6 @@
-# opencodewiki 底层引擎替换调研报告
+# OpenCodeWiki 底层引擎替换调研报告
 
-> 创建分支 `opencodewiki`，将 opencodewiki 的底层代码引擎从 GitNexus 替换为基于 Tree‑sitter 的替代方案，保持 Wiki + QA + 搜索功能不变，且 `opencodewiki/` 目录代码改动最小。
+> 创建分支 `opencodewiki`，将 OpenCodeWiki 的底层代码引擎从 GitNexus 替换为基于 Tree‑sitter 的替代方案，保持 Wiki + QA + 搜索功能不变，且 `opencodewiki/` 目录代码改动最小。
 
 ## 调研范围
 
@@ -115,14 +115,14 @@ const ctx = await cg.buildContext('how does auth work?', { format: 'markdown' })
 const impact = await cg.getImpactRadius('node-id-123', 2);
 ```
 
-**与 opencodewiki 接口映射**
+**与 OpenCodeWiki 接口映射**
 
 | `qa-endpoint.ts` 中引用的回调 | codegraph 替换方案 |
 |------|------|
 | `resolveRepo(repo)` → 获取 `storagePath` | `CodeGraph.open(path)` 替换，codegraph 自管理存储路径 |
-| `resolveLLMConfig()` → LLM 配置 | 保持不变，opencodewiki 侧无需修改 |
+| `resolveLLMConfig()` → LLM 配置 | 保持不变，OpenCodeWiki 侧无需修改 |
 | `searchCodebase(query, repo)` → 搜索+流程 | `cg.searchNodes(q)` + `cg.buildContext(q)` |
-| `listRepos()` → 注册仓库列表 | `ToolHandler` 跨项目缓存，或 opencodewiki 维护列表 |
+| `listRepos()` → 注册仓库列表 | `ToolHandler` 跨项目缓存，或 OpenCodeWiki 维护列表 |
 | 后端 MCP `callTool('query', ...)` | 直接调用 `cg.searchNodes()` / `cg.buildContext()` |
 | `hybridSearch` / `searchFTSFromLbug` | `cg.searchNodes()` FTS5 多通道 |
 
@@ -185,7 +185,7 @@ code_review_graph/
 
 **28 个 MCP 工具 (选列)**
 
-| 工具 | 功能 | 与 opencodewiki 相关度 |
+| 工具 | 功能 | 与 OpenCodeWiki 相关度 |
 |------|------|-------------------|
 | `build_or_update_graph_tool` | 增量/全量索引 | ★★★★★ 替换 analyze |
 | `get_minimal_context_tool` | ~100 token 超紧凑上下文 | ★★★★☆ 替换 context |
@@ -245,7 +245,7 @@ const res = await fetch('http://127.0.0.1:5555/messages/', {
 |----------|------|------|
 | TypeScript 原生接口 | 低 | SQLite 直读绕过 MCP 协议，TypeScript 直接 `better-sqlite3` |
 | REST HTTP API | 中 | 目前仅 MCP-over-HTTP (streamable-http)，非 REST。可写薄 Python FastAPI 或 TypeScript 侧 SQLite 直读 |
-| Q&A 管道 | 中 | 有向量搜索和 Wiki 生成，但无组合好的 Q&A 端点。需在 opencodewiki 侧组装：检索 → LLM → 流式响应 |
+| Q&A 管道 | 中 | 有向量搜索和 Wiki 生成，但无组合好的 Q&A 端点。需在 OpenCodeWiki 侧组装：检索 → LLM → 流式响应 |
 | 嵌入向量索引 | 低 | 当前全表扫描余弦相似度，大数据集需加向量索引 |
 
 **关键依赖**
@@ -366,8 +366,8 @@ const ctx = buildChatContext(graph, 'how does authentication work?');
 
 **理由**
 
-1. **TypeScript 同栈** — 与 opencodewiki 代码风格、构建工具、运行时完全一致。`qa-endpoint.ts` 无需跨语言桥接。
-2. **npm 库集成** — `npm install @colbymchenry/codegraph` 后直接 `import CodeGraph from '@colbymchenry/codegraph'`，opencodewiki 改动最小。
+1. **TypeScript 同栈** — 与 OpenCodeWiki 代码风格、构建工具、运行时完全一致。`qa-endpoint.ts` 无需跨语言桥接。
+2. **npm 库集成** — `npm install @colbymchenry/codegraph` 后直接 `import CodeGraph from '@colbymchenry/codegraph'`，OpenCodeWiki 改动最小。
 3. **SQLite FTS5 搜索** — 多通道搜索策略 (FTS5 + LIKE + 模糊 + CamelCase + 位置加权) 整体优于 gitnexus 的 ladybugdb + FTS。
 4. **`ContextBuilder`** — 多阶段流水线 (混合搜索 → 协同定位增强 → 类型层次 → BFS → 多样性上限) 可直接驱动 FAQ 检索。
 5. **集成路径清晰** — `ToolHandler` 抽离了业务逻辑，`ToolHandler.execute('codegraph_search', args)` 可直接在 Express 路由中调用。
@@ -404,7 +404,7 @@ const ctx = buildChatContext(graph, 'how does authentication work?');
 ## 推荐行动路径
 
 ```
-opencodewiki 分支
+OpenCodeWiki 分支
 │
 ├─ 第 1 步: 安装 codegraph 依赖
 │   npm install @colbymchenry/codegraph
@@ -420,7 +420,7 @@ opencodewiki 分支
 │   └─ 替换回调:
 │   │   resolveRepo     → CodeGraph.open()
 │   │   searchCodebase  → cg.searchNodes() + cg.buildContext()
-│   │   listRepos       → opencodewiki 维护列表
+│   │   listRepos       → OpenCodeWiki 维护列表
 │   │   (resolveLLMConfig → 保持不变)
 │
 ├─ 第 4 步: 更新 start.sh

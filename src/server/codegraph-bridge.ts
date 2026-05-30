@@ -416,5 +416,5 @@ app.get('/:repoName', async (req, res, next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`opencodewiki server running on http://localhost:${PORT}`);
+  console.log(`OpenCodeWiki server running on http://localhost:${PORT}`);
 });
